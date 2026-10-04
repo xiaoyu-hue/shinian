@@ -74,6 +74,11 @@
 
 ## 📄 License
 
-[MIT](./LICENSE) © xiaoyu-hue
+本项目采用双许可证：
+
+- **代码**（`*.html`、`*.css`、`*.js` 等）使用 [MIT](./LICENSE) 许可证
+- **文档**（`docs/` 目录、`README.md`）使用 [CC BY-NC-SA 4.0](./LICENSE-DOCS) 许可证——可自由分享与演绎，但禁止商用，且需署名并以相同方式共享
+
+© 2026 xiaoyu-hue
 
 > 「时念」——时间之内，念想之上。
