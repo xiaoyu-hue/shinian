@@ -163,7 +163,176 @@
     });
   }
 
-  // ---------- 帧率监测与毛玻璃降级 ----------
+  // ---------- 城市选择 ----------
+  var CITY_KEY = 'shinian.city.v1';
+  var DEFAULT_CITY = {name:'北京',lat:39.9042,lon:116.4074};
+  var currentCity = DEFAULT_CITY;
+  var allCities = [];
+
+  function loadCities() {
+    return fetch('data/cities.json')
+      .then(function(r){ return r.json(); })
+      .then(function(cities){ allCities = cities; })
+      .catch(function(){ allCities = [DEFAULT_CITY]; });
+  }
+
+  function getSavedCity() {
+    try {
+      var raw = localStorage.getItem(CITY_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch(e){ return null; }
+  }
+
+  function saveCity(city) {
+    currentCity = city;
+    localStorage.setItem(CITY_KEY, JSON.stringify(city));
+    document.getElementById('cityLabel').textContent = city.name;
+    // 拉取天气并通知 sky.js
+    ShiNianWeather.fetch(city).then(function(data){
+      updateWeatherDisplay(data);
+      window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: city, weather: data}}));
+    });
+  }
+
+  function renderCityList(filter) {
+    var list = document.getElementById('cityList');
+    list.innerHTML = '';
+    var q = (filter || '').toLowerCase();
+    var filtered = allCities.filter(function(c){
+      return !q || c.name.includes(q) || c.pinyin.includes(q);
+    });
+    filtered.forEach(function(c){
+      var li = document.createElement('li');
+      li.textContent = c.name;
+      if (currentCity && c.name === currentCity.name) li.className = 'selected';
+      li.addEventListener('click', function(){
+        saveCity(c);
+        document.getElementById('cityDrop').hidden = true;
+        document.getElementById('cityBar').classList.remove('open');
+        document.getElementById('citySearch').value = '';
+      });
+      list.appendChild(li);
+    });
+  }
+
+  function initCityPicker() {
+    var saved = getSavedCity();
+    if (saved) currentCity = saved;
+    document.getElementById('cityLabel').textContent = currentCity.name;
+    // 启动时拉取天气
+    ShiNianWeather.fetch(currentCity).then(function(data){
+      window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: currentCity, weather: data}}));
+    });
+
+    var bar = document.getElementById('cityBar');
+    var drop = document.getElementById('cityDrop');
+    var search = document.getElementById('citySearch');
+    var btn = document.getElementById('cityBtn');
+
+    btn.addEventListener('click', function(){
+      var open = !drop.hidden;
+      drop.hidden = open;
+      if (open) { bar.classList.remove('open'); }
+      else { bar.classList.add('open'); renderCityList(); search.focus(); }
+    });
+
+    search.addEventListener('input', function(){
+      renderCityList(search.value);
+    });
+
+    // 点击外部关闭
+    document.addEventListener('click', function(e){
+      if (!bar.contains(e.target)) {
+        drop.hidden = true;
+        bar.classList.remove('open');
+        search.value = '';
+      }
+    });
+
+    document.getElementById('refreshWeather').addEventListener('click', refreshWeather);
+  }
+
+  // ---- 天气图标映射 ----
+  var WEATHER_ICONS = {
+    0: '☀️', 1: '🌤', 2: '⛅', 3: '☁️', 45: '🌫', 48: '🌫',
+    51: '🌦', 53: '🌦', 55: '🌦', 61: '🌧', 63: '🌧', 65: '🌧',
+    71: '🌨', 73: '🌨', 75: '🌨', 80: '🌦', 81: '🌧', 82: '🌧',
+    95: '⛈', 96: '⛈', 99: '⛈'
+  };
+
+  function updateWeatherDisplay(weatherData) {
+    var line = document.getElementById('weatherLine');
+    var icon = document.getElementById('weatherIcon');
+    var temp = document.getElementById('weatherTemp');
+    var root = document.documentElement;
+
+    if (!weatherData) {
+      line.hidden = true;
+      root.removeAttribute('data-weather');
+      return;
+    }
+
+    var code = weatherData.weatherCode;
+    icon.textContent = WEATHER_ICONS[code] || '🌤';
+    temp.textContent = Math.round(weatherData.temperature) + '°';
+
+    // 天气代码 → data-weather 属性（驱动 CSS 装饰层）
+    var weatherType = 'clear';
+    if (code === 0 || code === 1) weatherType = 'clear';
+    else if (code === 2) weatherType = 'partly-cloudy';
+    else if (code === 3) weatherType = 'cloudy';
+    else if (code === 45 || code === 48) weatherType = 'fog';
+    else if (code >= 51 && code <= 55) weatherType = 'drizzle';
+    else if (code >= 61 && code <= 65) weatherType = 'rain';
+    else if (code >= 71 && code <= 75) weatherType = 'snow';
+    else if (code >= 95) weatherType = 'thunderstorm';
+    else if (code >= 80) weatherType = 'rain';
+
+    root.setAttribute('data-weather', weatherType);
+    line.hidden = false;
+    document.getElementById('refreshWeather').hidden = false;
+  }
+
+  function refreshWeather() {
+    var btn = document.getElementById('refreshWeather');
+    btn.textContent = '⟳';
+    ShiNianWeather.refresh(currentCity).then(function(data){
+      btn.textContent = '↻';
+      updateWeatherDisplay(data);
+      window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: currentCity, weather: data}}));
+    });
+  }
+
+  // ---------- 天气装饰初始化 ----------
+  function initWeatherEffects() {
+    // 雨滴
+    var rainBox = document.getElementById('rainCanvas');
+    for (var i = 0; i < 50; i++) {
+      var d = document.createElement('div');
+      d.className = 'rain-drop';
+      d.style.left = (Math.random() * 100) + '%';
+      d.style.top = -(Math.random() * 80) + 'px';
+      d.style.height = (6 + Math.random() * 10) + 'px';
+      d.style.animationDuration = (.5 + Math.random() * .8).toFixed(2) + 's';
+      d.style.animationDelay = (Math.random() * 2).toFixed(2) + 's';
+      rainBox.appendChild(d);
+    }
+    // 雪花
+    var snowBox = document.getElementById('snowCanvas');
+    for (var j = 0; j < 30; j++) {
+      var s = document.createElement('div');
+      s.className = 'snow-flake';
+      s.style.left = (Math.random() * 100) + '%';
+      s.style.top = -(Math.random() * 60) + 'px';
+      var size = 2 + Math.random() * 5;
+      s.style.width = size + 'px';
+      s.style.height = size + 'px';
+      s.style.animationDuration = (3 + Math.random() * 5).toFixed(2) + 's';
+      s.style.animationDelay = (Math.random() * 6).toFixed(2) + 's';
+      snowBox.appendChild(s);
+    }
+  }
+
   function initPerfMonitor() {
     var LOW_FPS = 30;                // 低于此帧率触发降级
     var WINDOW_MS = 2000;            // 采样窗口 2 秒
@@ -198,11 +367,15 @@
 
   // ---------- 启动 ----------
   function boot() {
-    tickClock();
-    setInterval(tickClock, 1000);
-    initForm();
-    initPerfMonitor();
-    render();
+    loadCities().then(function(){
+      initCityPicker();
+      initWeatherEffects();
+      tickClock();
+      setInterval(tickClock, 1000);
+      initForm();
+      initPerfMonitor();
+      render();
+    });
   }
 
   if (document.readyState === 'loading') {

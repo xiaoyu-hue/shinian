@@ -7,6 +7,7 @@
 <title>时念 · ShiNian</title>
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/sky.js" defer></script>
+<script src="assets/weather.js" defer></script>
 <script src="assets/app.js" defer></script>
 </head>
 <body>
@@ -17,6 +18,11 @@
     <div class="stars" id="stars" aria-hidden="true"></div>
   </div>
 
+  <!-- 天气装饰层 -->
+  <div class="weather-layer" aria-hidden="true"></div>
+  <div class="rain-canvas" id="rainCanvas" aria-hidden="true"></div>
+  <div class="snow-canvas" id="snowCanvas" aria-hidden="true"></div>
+
   <main>
     <!-- 时钟卡 -->
     <section class="hero">
@@ -26,8 +32,25 @@
           <span id="hh">--</span><span class="colon">:</span><span id="mm">--</span><span class="sec" id="ss">--</span>
         </div>
         <div class="date-line" id="dateLine">载入中…</div>
-      </div>
+        <div class="weather-line" id="weatherLine" hidden>
+          <span class="weather-icon" id="weatherIcon"></span>
+          <span class="weather-temp" id="weatherTemp"></span>
+        </div>
     </section>
+
+    <!-- 城市选择 -->
+    <div class="city-bar" id="cityBar">
+      <button type="button" class="city-btn" id="cityBtn" aria-label="选择城市">
+        <span class="city-pin">📍</span>
+        <span class="city-label" id="cityLabel">北京</span>
+        <span class="city-chev">▾</span>
+      </button>
+      <button type="button" class="refresh-btn" id="refreshWeather" aria-label="刷新天气" hidden>↻</button>
+      <div class="city-drop" id="cityDrop" hidden>
+        <input type="text" class="city-search" id="citySearch" placeholder="搜索城市…" autocomplete="off">
+        <ul class="city-list" id="cityList"></ul>
+      </div>
+    </div>
 
     <!-- 倒数日 -->
     <section class="countdown" aria-label="倒数日">
@@ -52,7 +75,7 @@
       </div>
     </section>
 
-    <footer class="foot">时念 · ShiNian</footer>
+    <footer class="foot">时念 · ShiNian<br>天气查询仅用于天空计算，不采集任何个人信息</footer>
   </main>
 </body>
 </html>

@@ -92,7 +92,60 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 18px 40px; }
 .card { padding: 20px 18px; }
 
 /* ---- 时钟卡 ---- */
-.hero { padding: 76px 0 34px; }
+.hero { padding: 76px 0 24px; }
+
+/* ---- 城市选择器 ---- */
+.city-bar { position: relative; margin: 0 0 14px; }
+.city-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border: 1px solid var(--hairline);
+  border-radius: 24px; background: var(--glass-bg-strong);
+  color: var(--text-dim); font: 13px/1 inherit;
+  font-family: inherit; cursor: pointer;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+}
+.city-btn:hover, .city-btn:focus { border-color: var(--accent); color: var(--text); outline: none; }
+.city-pin { font-size: 13px; line-height: 1; }
+.city-label { font-weight: 500; }
+.city-chev { font-size: 10px; margin-left: 2px; transition: transform var(--dur-fast); }
+.city-bar.open .city-chev { transform: rotate(180deg); }
+
+.refresh-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border: 1px solid var(--hairline);
+  border-radius: 50%; background: var(--glass-bg-strong);
+  color: var(--text-dim); font-size: 15px; cursor: pointer;
+  vertical-align: middle; margin-left: 4px;
+  transition: color var(--dur-fast), border-color var(--dur-fast);
+}
+.refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.city-drop {
+  position: absolute; top: 100%; left: 0; right: 0;
+  margin-top: 6px; border: 1px solid var(--glass-border);
+  border-radius: 14px; background: var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow); backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px); z-index: 10;
+  max-height: 280px; overflow: hidden;
+}
+.city-search {
+  width: 100%; min-height: 42px; padding: 10px 14px;
+  border: none; border-bottom: 1px solid var(--hairline);
+  background: transparent; color: var(--text);
+  font: 14px/1.4 inherit; font-family: inherit;
+  outline: none;
+}
+.city-search::placeholder { color: var(--text-faint); }
+.city-list {
+  list-style: none; max-height: 226px; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.city-list li {
+  padding: 11px 14px; cursor: pointer; font-size: 14px;
+  color: var(--text-dim); transition: background var(--dur-fast), color var(--dur-fast);
+}
+.city-list li:hover, .city-list li:focus { background: var(--accent-soft); color: var(--text); outline: none; }
+.city-list li.selected { color: var(--accent); font-weight: 500; }
 /* 时钟卡进场 */
 .clock-card { text-align: center; padding: 34px 18px 28px; animation: cardIn .6s var(--ease-out) both; }
 
@@ -118,6 +171,62 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 18px 40px; }
 @keyframes breathe { 50% { opacity: .35; } }
 
 .date-line { margin-top: 14px; font-size: 14px; color: var(--text-dim); letter-spacing: .06em; }
+
+/* ---- 天气显示行 ---- */
+.weather-line { margin-top: 8px; font-size: 14px; color: var(--text-dim); }
+.weather-icon { font-size: 16px; margin-right: 4px; vertical-align: middle; }
+.weather-temp { font-weight: 500; vertical-align: middle; }
+
+/* ---- 天气装饰层（全局天空叠加） ---- */
+.weather-layer {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  overflow: hidden; opacity: 0; transition: opacity 1.2s;
+}
+:root[data-weather="cloudy"] .weather-layer,
+:root[data-weather="partly-cloudy"] .weather-layer { opacity: 1; }
+
+/* 阴天：饱和度降低 */
+:root[data-weather="cloudy"] .sky {
+  filter: saturate(0.7);
+  transition: filter 1.2s;
+}
+:root[data-weather="partly-cloudy"] .sky {
+  filter: saturate(0.85);
+  transition: filter 1.2s;
+}
+
+/* 雾：底部乳白渐变 */
+:root[data-weather="fog"] .weather-layer {
+  opacity: 1;
+  background: linear-gradient(to top, rgba(220,230,240,.25) 0%, transparent 60%);
+}
+
+/* 雨丝 */
+.rain-canvas {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  opacity: 0; transition: opacity .8s;
+}
+:root[data-weather="rain"] .rain-canvas,
+:root[data-weather="drizzle"] .rain-canvas,
+:root[data-weather="thunderstorm"] .rain-canvas { opacity: 1; }
+.rain-drop {
+  position: absolute; width: 1.5px; background: rgba(180,210,240,.18);
+  animation: rainFall linear infinite;
+}
+@keyframes rainFall { to { transform: translateY(100vh) translateX(-30px); } }
+
+/* 雪花 */
+.snow-canvas {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  opacity: 0; transition: opacity .8s;
+}
+:root[data-weather="snow"] .snow-canvas { opacity: 1; }
+.snow-flake {
+  position: absolute; border-radius: 50%;
+  background: rgba(240,245,255,.22);
+  animation: snowFall linear infinite;
+}
+@keyframes snowFall { to { transform: translateY(100vh) rotate(360deg); } }
 
 /* ---- 倒数日 ---- */
 .countdown { padding: 8px 0 20px; }
@@ -255,4 +364,5 @@ input[type="date"] { color-scheme: dark; }
     transition-duration: .01ms !important;
   }
   .stars i { animation: none; opacity: .6; }
+  .rain-drop, .snow-flake { animation: none !important; }
 }

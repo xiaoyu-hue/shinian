@@ -1,25 +1,17 @@
 /* ============================================================
-   时念 · 天空引擎 v1（时刻层）
+   时念 · 天空引擎 v2（时刻层 + 天文驱动）
    ------------------------------------------------------------
-   职责：根据当前时刻，把七个时段的色阶做分钟级插值，
-   输出为一组 CSS 变量（:root 上），并按天空亮度切换玻璃配方。
+   v2 升级：锚点从硬编码升级为真实日出日落驱动。
+   无天气数据时回退 v1 硬编码锚点。
 
-   设计约定（与 PRD 2.1/2.3 对应）：
-   1. 每个时段锚点 = 「天空顶色 / 天空底色 / 光晕 / 星星透明度」四件套；
-   2. 插值只在相邻锚点间进行，任意时刻的颜色都在自然直觉内；
-   3. 玻璃配方（dark/light）由插值后底色亮度决定，阈值 0.42；
-   4. 更新频率 60 秒/次，重绘成本极低。
-
-   调试：URL 加 ?t=HH:MM 可模拟任意时刻（仅本地调试用）。
+   调试：?t=HH:MM 模拟时刻，?lat=XX&lon=YY 指定坐标
    ============================================================ */
 
 (function () {
   'use strict';
 
-  // ---- 七时段锚点 ----
-  // h: 锚点时刻(小时, 可带小数)；name: 眉题显示
-  // top/bottom: 天空渐变上下色；glow: [r,g,b,a] 光晕；stars: 星星层透明度
-  var STOPS = [
+  // ---- 默认锚点（v1 硬编码，无天气时回退）----
+  var DEFAULT_STOPS = [
     { h: 0.0,  name: '深夜', top: '#030d18', bottom: '#0a3050', glow: [109,161,212,.20], stars: 1 },
     { h: 4.8,  name: '深夜', top: '#0a1a2c', bottom: '#123a56', glow: [109,161,212,.22], stars: 1 },
     { h: 6.3,  name: '黎明', top: '#2a3c58', bottom: '#c98a5e', glow: [214,150,110,.30], stars: .1 },
@@ -31,6 +23,60 @@
     { h: 21.2, name: '夜',   top: '#04101c', bottom: '#0a3050', glow: [109,161,212,.20],  stars: 1 },
     { h: 24.0, name: '深夜', top: '#030d18', bottom: '#0a3050', glow: [109,161,212,.20],  stars: 1 }
   ];
+
+  // 当前生效的锚点
+  var STOPS = DEFAULT_STOPS;
+
+  // ---- 动态锚点构建 ----
+  // 以日出日落为中心，颜色模板不变，只调整 h 值
+  function buildDynamicStops(sunriseH, sunsetH) {
+    // 边界保护：日出不早于 3 点，日落不晚于 22 点
+    var sr = Math.max(3.5, Math.min(sunriseH, 8.5));
+    var ss = Math.max(15.5, Math.min(sunsetH, 22.0));
+    var dawnH = Math.max(1.0, sr - 1.2);       // 黎明前 1.2 小时
+    var mornH = sr + 0.8;                       // 日出后 0.8 小时
+    var afterH = Math.min(ss - 2.5, 17.5);      // 日落前 2.5 小时
+    var duskH = Math.min(ss + 1.2, 23.0);       // 日落后 1.2 小时
+    var nightH = Math.min(ss + 2.5, 23.5);      // 日落后 2.5 小时
+
+    return [
+      { h: 0.0,   name: '深夜', top: '#030d18', bottom: '#0a3050', glow: [109,161,212,.20], stars: 1 },
+      { h: dawnH, name: '深夜', top: '#0a1a2c', bottom: '#123a56', glow: [109,161,212,.22], stars: 1 },
+      { h: sr,    name: '黎明', top: '#2a3c58', bottom: '#c98a5e', glow: [214,150,110,.30], stars: .1 },
+      { h: mornH, name: '清晨', top: '#4c7fa8', bottom: '#c8dde9', glow: [255,244,214,.32], stars: 0 },
+      { h: 12.5,  name: '正午', top: '#4c86b8', bottom: '#bcd9ec', glow: [255,255,255,.28],  stars: 0 },
+      { h: afterH,name: '午后', top: '#4a7aa4', bottom: '#c4d7da', glow: [250,240,220,.26],  stars: 0 },
+      { h: ss,    name: '日落', top: '#35547a', bottom: '#e0855c', glow: [240,160,100,.32],  stars: 0 },
+      { h: duskH, name: '暮色', top: '#12253c', bottom: '#5c4266', glow: [140,110,190,.25],  stars: .45 },
+      { h: nightH,name: '夜',   top: '#04101c', bottom: '#0a3050', glow: [109,161,212,.20],  stars: 1 },
+      { h: 24.0,  name: '深夜', top: '#030d18', bottom: '#0a3050', glow: [109,161,212,.20],  stars: 1 }
+    ];
+  }
+
+  // 从 ISO 时间字符串提取小时（含小数）
+  function extractHour(isoStr) {
+    if (!isoStr) return null;
+    var m = isoStr.match(/T(\d{2}):(\d{2})/);
+    if (!m) return null;
+    return (+m[1]) + (+m[2]) / 60;
+  }
+
+  // 监听城市/天气变更
+  window.addEventListener('cityChange', function (e) {
+    var w = e.detail && e.detail.weather;
+    if (w && w.sunrise && w.sunset) {
+      var sr = extractHour(w.sunrise);
+      var ss = extractHour(w.sunset);
+      if (sr !== null && ss !== null && sr < ss) {
+        STOPS = buildDynamicStops(sr, ss);
+        paint();
+        return;
+      }
+    }
+    // 无天气数据 → 回退默认
+    STOPS = DEFAULT_STOPS;
+    paint();
+  });
 
   function hex2rgb(h) {
     return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
