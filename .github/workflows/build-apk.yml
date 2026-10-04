@@ -37,17 +37,15 @@ jobs:
         working-directory: android
         run: bash gradlew assembleDebug --no-daemon
 
-      - name: 上传 APK 到 v0.1.0 Release
+      - name: 验证 APK 文件
         run: |
-          RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/v0.1.0 \
-            | jq -r '.id')
-          echo "Release ID: $RELEASE_ID"
-          curl -s -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Content-Type: application/vnd.android.package-archive" \
-            --data-binary @android/app/build/outputs/apk/debug/app-debug.apk \
-            "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=时念-ShiNian-v0.1.0.apk" \
-            | jq -r '.browser_download_url'
+          ls -lh android/app/build/outputs/apk/debug/app-debug.apk
+          file android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: 上传 APK 到 v0.1.0 Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload v0.1.0 android/app/build/outputs/apk/debug/app-debug.apk \
+            --repo ${{ github.repository }} \
+            --clobber
