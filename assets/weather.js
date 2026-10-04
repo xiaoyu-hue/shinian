@@ -12,7 +12,7 @@ var ShiNianWeather = (function () {
   'use strict';
 
   var CACHE_MS = 15 * 60 * 1000;   // 缓存 15 分钟
-  var TIMEOUT_MS = 5000;            // 请求超时 5 秒
+  var TIMEOUT_MS = 8000;            // 请求超时 8 秒（GitHub Pages 网络较慢）
 
   var cache = null;                 // {cityKey, data, timestamp}
 

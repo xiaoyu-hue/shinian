@@ -219,10 +219,6 @@
     var saved = getSavedCity();
     if (saved) currentCity = saved;
     document.getElementById('cityLabel').textContent = currentCity.name;
-    // 启动时拉取天气
-    ShiNianWeather.fetch(currentCity).then(function(data){
-      window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: currentCity, weather: data}}));
-    });
 
     var bar = document.getElementById('cityBar');
     var drop = document.getElementById('cityDrop');
@@ -367,14 +363,20 @@
 
   // ---------- 启动 ----------
   function boot() {
-    loadCities().then(function(){
+    tickClock();
+    setInterval(tickClock, 1000);
+    initForm();
+    initPerfMonitor();
+    render();
+    // 城市数据与天气异步启动，不阻塞主界面
+    loadCities().then(function() {
       initCityPicker();
       initWeatherEffects();
-      tickClock();
-      setInterval(tickClock, 1000);
-      initForm();
-      initPerfMonitor();
-      render();
+      // 启动时拉取天气
+      ShiNianWeather.fetch(currentCity).then(function(data){
+        updateWeatherDisplay(data);
+        window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: currentCity, weather: data}}));
+      });
     });
   }
 
