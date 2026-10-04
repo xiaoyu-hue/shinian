@@ -1,9 +1,7 @@
 name: 构建 Android APK
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -39,9 +37,10 @@ jobs:
         working-directory: android
         run: chmod +x gradlew && ./gradlew assembleDebug
 
-      - name: 上传 APK 到 Release
+      - name: 上传 APK 到 v0.1.0 Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v0.1.0
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
