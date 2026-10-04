@@ -50,7 +50,11 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { height: 100%; }
+html {
+  height: 100%;
+  /* 阻止 iOS 横屏时自动放大文字，保住排版 */
+  -webkit-text-size-adjust: 100%;
+}
 
 body {
   min-height: 100%;
@@ -59,9 +63,23 @@ body {
   background: linear-gradient(178deg, var(--sky-top) 0%, var(--sky-bottom) 100%) fixed;
   transition: background var(--dur-base) var(--ease-out);
   -webkit-font-smoothing: antialiased;
+  /* 移动端：去掉点击时的默认蓝色高亮块；禁止下拉触发浏览器刷新 */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
 
-main { max-width: var(--maxw); margin: 0 auto; padding: 0 18px 40px; }
+/* 左右/底部安全区：让内容避开刘海、灵动岛与底部手势条 */
+main {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding-top: 0;
+  padding-right: 18px;
+  padding-bottom: 40px;
+  padding-left: 18px;
+  padding-right: max(18px, env(safe-area-inset-right, 0px));
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(18px, env(safe-area-inset-left, 0px));
+}
 
 /* ---- 天空舞台（背景装饰层） ---- */
 .sky { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
@@ -92,33 +110,54 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 18px 40px; }
 .card { padding: 20px 18px; }
 
 /* ---- 时钟卡 ---- */
-.hero { padding: 76px 0 24px; }
+/* 顶部安全区：刘海/灵动岛机型自动多留出空间，无刘海机型保持 76px 不变 */
+.hero {
+  padding-top: 76px;
+  padding-top: max(76px, calc(env(safe-area-inset-top, 0px) + 28px));
+  padding-bottom: 24px;
+}
 
 /* ---- 城市选择器 ---- */
 .city-bar { position: relative; margin: 0 0 14px; }
 .city-btn {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 14px; border: 1px solid var(--hairline);
+  min-height: 44px;                 /* 触控目标 ≥44px */
+  padding: 8px 15px; border: 1px solid var(--hairline);
   border-radius: 24px; background: var(--glass-bg-strong);
   color: var(--text-dim); font: 13px/1 inherit;
   font-family: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: border-color var(--dur-fast), color var(--dur-fast);
 }
 .city-btn:hover, .city-btn:focus { border-color: var(--accent); color: var(--text); outline: none; }
+.city-btn:active { background: var(--accent-soft); color: var(--text); }
 .city-pin { font-size: 13px; line-height: 1; }
 .city-label { font-weight: 500; }
 .city-chev { font-size: 10px; margin-left: 2px; transition: transform var(--dur-fast); }
 .city-bar.open .city-chev { transform: rotate(180deg); }
 
+/* 触控区 44×44（手指友好），视觉仍是 32px 的小圆 */
 .refresh-btn {
+  position: relative;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border: 1px solid var(--hairline);
-  border-radius: 50%; background: var(--glass-bg-strong);
+  width: 44px; height: 44px;
+  border: none; background: none;
   color: var(--text-dim); font-size: 15px; cursor: pointer;
-  vertical-align: middle; margin-left: 4px;
-  transition: color var(--dur-fast), border-color var(--dur-fast);
+  vertical-align: middle; margin-left: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--dur-fast);
 }
-.refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
+.refresh-btn::before {
+  content: '';
+  position: absolute; left: 50%; top: 50%; margin: -16px 0 0 -16px;
+  width: 32px; height: 32px;
+  border: 1px solid var(--hairline);
+  border-radius: 50%; background: var(--glass-bg-strong);
+  transition: border-color var(--dur-fast);
+}
+.refresh-btn:hover, .refresh-btn:focus { color: var(--accent); outline: none; }
+.refresh-btn:hover::before, .refresh-btn:focus::before { border-color: var(--accent); }
+.refresh-btn:active { opacity: .55; }
 
 .city-drop {
   position: absolute; top: 100%; left: 0; right: 0;
@@ -126,25 +165,36 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 18px 40px; }
   border-radius: 14px; background: var(--glass-bg-strong);
   box-shadow: var(--glass-shadow); backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px); z-index: 10;
-  max-height: 280px; overflow: hidden;
+  /* 小屏/软键盘弹起时不至于顶出屏幕 */
+  max-height: min(280px, 46vh);
+  display: flex; flex-direction: column; overflow: hidden;
 }
+/* display:flex 会盖过 hidden 属性的默认 display:none，必须显式声明回来，
+   否则城市下拉会永远展开 */
+.city-drop[hidden] { display: none; }
 .city-search {
-  width: 100%; min-height: 42px; padding: 10px 14px;
+  width: 100%; min-height: 46px; padding: 10px 14px;
   border: none; border-bottom: 1px solid var(--hairline);
   background: transparent; color: var(--text);
-  font: 14px/1.4 inherit; font-family: inherit;
+  font: 16px/1.4 inherit; font-family: inherit;   /* 16px：避免 iOS 聚焦时整页放大 */
+  flex-shrink: 0;
   outline: none;
 }
 .city-search::placeholder { color: var(--text-faint); }
 .city-list {
-  list-style: none; max-height: 226px; overflow-y: auto;
+  list-style: none; flex: 1; min-height: 0; overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 .city-list li {
+  display: flex; align-items: center;
+  min-height: 44px;                 /* 触控目标 ≥44px */
   padding: 11px 14px; cursor: pointer; font-size: 14px;
   color: var(--text-dim); transition: background var(--dur-fast), color var(--dur-fast);
+  -webkit-tap-highlight-color: transparent;
 }
 .city-list li:hover, .city-list li:focus { background: var(--accent-soft); color: var(--text); outline: none; }
+.city-list li:active { background: var(--accent-soft); color: var(--text); }
 .city-list li.selected { color: var(--accent); font-weight: 500; }
 /* 时钟卡进场 */
 .clock-card { text-align: center; padding: 34px 18px 28px; animation: cardIn .6s var(--ease-out) both; }
@@ -213,7 +263,8 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 18px 40px; }
   position: absolute; width: 1.5px; background: rgba(180,210,240,.18);
   animation: rainFall linear infinite;
 }
-@keyframes rainFall { to { transform: translateY(100vh) translateX(-30px); } }
+/* +120px：确保雨滴落到屏幕外再循环，不会在半空消失 */
+@keyframes rainFall { to { transform: translateY(calc(100vh + 120px)) translateX(-30px); } }
 
 /* 雪花 */
 .snow-canvas {
@@ -226,7 +277,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: 0 18px 40px; }
   background: rgba(240,245,255,.22);
   animation: snowFall linear infinite;
 }
-@keyframes snowFall { to { transform: translateY(100vh) rotate(360deg); } }
+@keyframes snowFall { to { transform: translateY(calc(100vh + 120px)) rotate(360deg); } }
 
 /* ---- 倒数日 ---- */
 .countdown { padding: 8px 0 20px; }
@@ -245,7 +296,7 @@ input[type="text"], input[type="date"] {
   border: 1px solid var(--hairline);
   background: var(--glass-bg-strong);
   color: var(--text);
-  font: 400 15px/1.4 inherit;
+  font: 400 16px/1.4 inherit;   /* 16px：避免 iOS 聚焦时整页放大 */
   font-family: inherit;
   transition: border-color var(--dur-fast) var(--ease-out);
 }
@@ -347,9 +398,97 @@ input[type="date"] { color-scheme: dark; }
 .foot { text-align: center; font-size: 11.5px; color: var(--text-dim);
         letter-spacing: .08em; padding: 26px 0 10px; }
 
+/* ============================================================
+   机型适配：按屏幕尺寸切换排版
+   ------------------------------------------------------------
+   ① 超窄档 ≤340px  — 折叠屏外屏、iPhone SE1 等小屏
+   ② 横屏档        — 手机横过来（高度 ≤600px）：左右分栏
+   ③ 宽屏档        — 平板 / 折叠屏展开（≥680px 宽且够高）：左右双列
+   注意：②③ 互不重叠（横屏高度不足 600px 时不会命中宽屏档）
+   ============================================================ */
+
+/* ① 超窄档：收缩内边距与字号，保证内容完整、不横向溢出 */
+@media (max-width: 340px) {
+  :root { --radius: 16px; }
+  main {
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+  }
+  .hero {
+    padding-top: 64px;
+    padding-top: max(64px, calc(env(safe-area-inset-top, 0px) + 24px));
+    padding-bottom: 18px;
+  }
+  .clock-card { padding: 26px 14px 22px; }
+  .clock { font-size: clamp(52px, 19vw, 66px); }
+  .card { padding: 16px 14px; }
+  /* 倒数日卡片改两行：名字独占一行，天数与按钮在第二行。
+     这样既保住 44px 触控区，又不会把名字挤成一串省略号 */
+  .cd-item { flex-wrap: wrap; gap: 8px; padding: 14px 12px; }
+  .cd-info { flex: 1 0 100%; }
+  .cd-days { margin-right: auto; }
+  .cd-days .n { font-size: 23px; }
+  .city-btn { padding: 8px 12px; }
+  .section-title { margin: 16px 0 12px; }
+  .empty { padding: 22px 16px; }
+}
+
+/* ②③ 共用：左右分栏骨架（.col-left 包住时钟与城市栏，保证二者始终相邻） */
+@media (orientation: landscape) and (max-height: 600px),
+       (min-width: 680px) and (min-height: 600px) {
+  main {
+    max-width: 880px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "left      countdown"
+      "foot      foot";
+    align-items: start;
+    column-gap: 22px;
+  }
+  .col-left  { grid-area: left; min-width: 0; }
+  .hero      { padding-bottom: 14px; }
+  .city-bar  { margin-bottom: 0; }
+  .countdown { grid-area: countdown; padding: 8px 0 12px; }
+  .foot      { grid-area: foot; padding: 18px 0 4px; }
+  .section-title { margin: 10px 0 14px; }
+  .clock-card { padding: 26px 20px 24px; }
+  .eyebrow { margin-bottom: 12px; }
+}
+
+/* ② 横屏档：高度吃紧，压缩纵向留白，时钟按屏高取字号 */
+@media (orientation: landscape) and (max-height: 600px) {
+  main { padding-top: 8px; }
+  .hero {
+    padding-top: 20px;
+    padding-top: max(20px, calc(env(safe-area-inset-top, 0px) + 8px));
+  }
+  .clock { font-size: clamp(44px, 13vh, 72px); }
+  .date-line { margin-top: 10px; }
+}
+
+/* ③ 宽屏档：空间充裕，时钟放大，天空光晕同步放大避免空旷 */
+@media (min-width: 680px) and (min-height: 600px) {
+  .clock { font-size: clamp(74px, 9vw, 100px); }
+  .hero {
+    padding-top: 88px;
+    padding-top: max(88px, calc(env(safe-area-inset-top, 0px) + 32px));
+  }
+  .orb-a { width: 520px; height: 520px; top: -120px; left: -130px; }
+  .orb-b { width: 640px; height: 640px; bottom: -180px; right: -180px; }
+}
+
 /* ---- 可访问性与降级 ---- */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden;
            clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* 高清屏（2 倍及以上）：1px 边框实际会画成 2~3 个物理像素，偏粗。
+   降到 .5px 后玻璃边框更纤细精致 */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx) {
+  .glass,
+  input[type="text"],
+  input[type="date"] { border-width: .5px; }
+}
 
 /* 毛玻璃性能降级：低帧率设备自动关闭 backdrop-filter */
 :root[data-low-perf] .glass {

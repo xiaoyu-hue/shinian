@@ -24,8 +24,10 @@
   <div class="snow-canvas" id="snowCanvas" aria-hidden="true"></div>
 
   <main>
-    <!-- 时钟卡 -->
-    <section class="hero">
+    <!-- 左列容器：手机上是普通竖排；宽屏/横屏时与时钟同列 -->
+    <div class="col-left">
+      <!-- 时钟卡 -->
+      <section class="hero">
       <div class="glass clock-card" role="group" aria-label="当前时间">
         <div class="eyebrow" id="phaseName">—</div>
         <div class="clock" id="clock" aria-hidden="true">
@@ -51,6 +53,7 @@
         <input type="text" class="city-search" id="citySearch" placeholder="搜索城市…" autocomplete="off">
         <ul class="city-list" id="cityList"></ul>
       </div>
+    </div>
     </div>
 
     <!-- 倒数日 -->

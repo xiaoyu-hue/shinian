@@ -90,6 +90,9 @@
   function rgbStr(c, a) {
     return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (a === undefined ? 1 : a) + ')';
   }
+  function hexStr(c) {
+    return '#' + c.map(function (v) { return ('0' + v.toString(16)).slice(-2); }).join('');
+  }
   // 相对亮度（WCAG 简化版）：0 暗到 1 亮
   function lum(c) {
     return (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
@@ -139,6 +142,10 @@
     root.setProperty('--stars-o', stars);
     root.setProperty('--phase-name', name);
 
+    // 移动端状态栏颜色跟随天空（安卓 Chrome 顶部会变色，沉浸感更强）
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', hexStr(top));
+
     // 亮度联动玻璃配方（PRD 2.2/2.3：白天天空 → 亮配方深字）
     var recipe = lum(bottom) > 0.42 ? 'light' : 'dark';
     document.documentElement.setAttribute('data-recipe', recipe);
@@ -147,7 +154,8 @@
   function initStars() {
     var box = document.getElementById('stars');
     if (!box) return;
-    var n = 44;
+    // 宽屏（平板 / 折叠展开）铺更多星星，避免夜空显得空旷
+    var n = window.innerWidth >= 680 ? 90 : 44;
     for (var i = 0; i < n; i++) {
       var s = document.createElement('i');
       s.style.left = (Math.random() * 100) + '%';
