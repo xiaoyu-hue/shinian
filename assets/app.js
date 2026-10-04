@@ -124,11 +124,45 @@
     });
   }
 
+  // ---------- 帧率监测与毛玻璃降级 ----------
+  function initPerfMonitor() {
+    var LOW_FPS = 30;                // 低于此帧率触发降级
+    var WINDOW_MS = 2000;            // 采样窗口 2 秒
+    var TRIGGER_COUNT = 3;           // 连续 3 次低于阈值才降级
+    var lowCount = 0;
+    var frames = 0;
+    var lastSample = performance.now();
+
+    function sample() {
+      frames++;
+      var now = performance.now();
+      var elapsed = now - lastSample;
+      if (elapsed >= WINDOW_MS) {
+        var fps = Math.round(frames / (elapsed / 1000));
+        frames = 0;
+        lastSample = now;
+
+        if (fps < LOW_FPS) {
+          lowCount++;
+          if (lowCount >= TRIGGER_COUNT) {
+            document.documentElement.setAttribute('data-low-perf', '');
+          }
+        } else {
+          lowCount = Math.max(0, lowCount - 1);
+        }
+      }
+      requestAnimationFrame(sample);
+    }
+
+    requestAnimationFrame(sample);
+  }
+
   // ---------- 启动 ----------
   function boot() {
     tickClock();
     setInterval(tickClock, 1000);
     initForm();
+    initPerfMonitor();
     render();
   }
 
