@@ -1,0 +1,9 @@
+{
+  "appId": "io.xiaoyuhue.shinian",
+  "appName": "时念",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false
+  }
+}

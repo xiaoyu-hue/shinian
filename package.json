@@ -1,0 +1,18 @@
+{
+  "name": "shinian",
+  "version": "0.1.0",
+  "description": "时念 ShiNian — 活着的窗景：天空随时刻与四季流动的时间工具",
+  "private": true,
+  "scripts": {
+    "build": "mkdir -p www && cp index.html www/ && cp -r assets www/",
+    "cap:add": "npx cap add android",
+    "cap:sync": "npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.2.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.2.1",
+    "@capacitor/android": "^7.2.1"
+  }
+}
