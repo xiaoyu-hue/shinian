@@ -61,6 +61,9 @@
     return (+m[1]) + (+m[2]) / 60;
   }
 
+  // 设置面板改了配方锁定：立刻重算
+  window.addEventListener('recipeChange', function () { paint(); });
+
   // 监听城市/天气变更
   window.addEventListener('cityChange', function (e) {
     var w = e.detail && e.detail.weather;
@@ -161,7 +164,11 @@
     }
 
     // 亮度联动玻璃配方（PRD 2.2/2.3：白天天空 → 亮配方深字）
-    var recipe = lum(bottom) > 0.42 ? 'light' : 'dark';
+    // 若用户在设置里手动锁定了配方，则锁定值优先
+    var lock = document.documentElement.getAttribute('data-recipe-lock');
+    var recipe = (lock === 'light' || lock === 'dark')
+      ? lock
+      : (lum(bottom) > 0.42 ? 'light' : 'dark');
     document.documentElement.setAttribute('data-recipe', recipe);
   }
 

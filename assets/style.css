@@ -161,8 +161,9 @@ main {
 .city-chev { font-size: 10px; margin-left: 2px; transition: transform var(--dur-fast); }
 .city-bar.open .city-chev { transform: rotate(180deg); }
 
-/* 触控区 44×44（手指友好），视觉仍是 32px 的小圆 */
-.refresh-btn {
+/* 刷新与设置：触控区 44×44（手指友好），视觉仍是 32px 的小圆 */
+.refresh-btn,
+.settings-btn {
   position: relative;
   display: inline-flex; align-items: center; justify-content: center;
   width: 44px; height: 44px;
@@ -172,7 +173,8 @@ main {
   -webkit-tap-highlight-color: transparent;
   transition: color var(--dur-fast);
 }
-.refresh-btn::before {
+.refresh-btn::before,
+.settings-btn::before {
   content: '';
   position: absolute; left: 50%; top: 50%; margin: -16px 0 0 -16px;
   width: 32px; height: 32px;
@@ -180,9 +182,94 @@ main {
   border-radius: 50%; background: var(--glass-bg-strong);
   transition: border-color var(--dur-fast);
 }
-.refresh-btn:hover, .refresh-btn:focus { color: var(--accent); outline: none; }
-.refresh-btn:hover::before, .refresh-btn:focus::before { border-color: var(--accent); }
-.refresh-btn:active { opacity: .55; }
+.refresh-btn:hover, .refresh-btn:focus,
+.settings-btn:hover, .settings-btn:focus { color: var(--accent); outline: none; }
+.refresh-btn:hover::before, .refresh-btn:focus::before,
+.settings-btn:hover::before, .settings-btn:focus::before { border-color: var(--accent); }
+.refresh-btn:active, .settings-btn:active { opacity: .55; }
+.settings-btn { font-size: 16px; }
+
+/* ---- 设置与数据面板 ---- */
+.settings-drop {
+  position: absolute; top: 100%; left: 0; right: 0;
+  margin-top: 6px; padding: 14px;
+  border: 1px solid var(--glass-border); border-radius: 16px;
+  background: var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  z-index: 12;
+  max-height: min(420px, 62vh); overflow-y: auto; overscroll-behavior: contain;
+}
+/* 需显式声明，否则会盖过 hidden 属性的 display:none */
+.settings-drop[hidden] { display: none; }
+
+.set-block + .set-block { margin-top: 14px; padding-top: 14px;
+                         border-top: 1px solid var(--hairline); }
+.set-label { font-size: 12px; letter-spacing: .12em; color: var(--text-faint); margin-bottom: 10px; }
+
+/* 分段控件：跟随天空 / 亮 / 暗 */
+.set-seg { display: flex; gap: 6px; }
+.set-seg button {
+  flex: 1; min-height: 44px;
+  border: 1px solid var(--hairline); border-radius: 10px;
+  background: transparent; color: var(--text-dim);
+  font: 13px/1 inherit; font-family: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+.set-seg button.on {
+  background: var(--accent-soft); color: var(--text); border-color: var(--accent);
+}
+
+/* 开关行 */
+.set-row { display: flex; align-items: center; justify-content: space-between;
+           min-height: 44px; font-size: 14px; color: var(--text-dim); cursor: pointer; }
+.set-toggle {
+  position: relative; width: 46px; height: 28px; flex-shrink: 0;
+  border: 1px solid var(--hairline); border-radius: 999px;
+  background: rgba(120,140,160,.18); cursor: pointer;
+  transition: background var(--dur-fast), border-color var(--dur-fast);
+}
+.set-toggle::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--text-faint);
+  transition: transform 240ms var(--spring), background var(--dur-fast);
+}
+.set-toggle.on { background: var(--accent-soft); border-color: var(--accent); }
+.set-toggle.on::after { transform: translateX(18px); background: var(--accent); }
+
+/* 数据操作 */
+.set-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.set-btn {
+  min-height: 44px; padding: 0 10px;
+  border: 1px solid var(--hairline); border-radius: 10px;
+  background: transparent; color: var(--text-dim);
+  font: 13px/1 inherit; font-family: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.set-btn:active { background: var(--accent-soft); color: var(--text); }
+.set-btn.danger { color: var(--danger); }
+.set-hint { margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--text-faint); }
+
+/* 设置驱动：关闭天气装饰层 */
+:root[data-no-decor] .weather-layer,
+:root[data-no-decor] .rain-canvas,
+:root[data-no-decor] .snow-canvas { display: none; }
+:root[data-no-decor] .sky { filter: none !important; }
+
+/* 设置驱动：关闭微交互（与系统「减弱动态」同等处理） */
+:root[data-no-motion] *,
+:root[data-no-motion] *::before,
+:root[data-no-motion] *::after {
+  animation-duration: .01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .01ms !important;
+}
+:root[data-no-motion] .stars i { animation: none; opacity: .6; }
+:root[data-no-motion] .rain-drop,
+:root[data-no-motion] .snow-flake { animation: none !important; }
 
 .city-drop {
   position: absolute; top: 100%; left: 0; right: 0;

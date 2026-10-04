@@ -197,6 +197,7 @@
     });
 
     hasRendered = true;
+    syncSettingsUI();       // 让设置面板里的条目数保持同步
   }
 
   // 删除：高度收拢 + 淡出，结束后其余条目由 render 的 FLIP 平滑上移
@@ -358,6 +359,7 @@
 
   // 城市下拉：展开 / 收起带高度动画（不支持的浏览器直接切换，不会报错）
   function openDrop(drop, bar, search) {
+    closeSettings();          // 与设置面板互斥，同时只开一个
     drop.hidden = false;
     bar.classList.add('open');
     renderCityList();
@@ -401,7 +403,7 @@
 
     // 点击外部关闭
     document.addEventListener('click', function(e){
-      if (!bar.contains(e.target)) { closeDrop(drop, bar, search); }
+      if (!bar.contains(e.target)) { closeDrop(drop, bar, search); closeSettings(); }
     });
 
     document.getElementById('refreshWeather').addEventListener('click', refreshWeather);
@@ -470,6 +472,212 @@
     });
   }
 
+  // ============================================================
+  // 设置与数据
+  // 设置持久化在 localStorage['shinian.settings.v1']
+  // ============================================================
+  var SET_KEY = 'shinian.settings.v1';
+  var settings = { recipe: 'auto', motion: true, decor: true };
+
+  function loadSettings() {
+    try {
+      var s = JSON.parse(localStorage.getItem(SET_KEY) || 'null');
+      if (s && typeof s === 'object') {
+        if (s.recipe === 'auto' || s.recipe === 'light' || s.recipe === 'dark') settings.recipe = s.recipe;
+        if (typeof s.motion === 'boolean') settings.motion = s.motion;
+        if (typeof s.decor === 'boolean') settings.decor = s.decor;
+      }
+    } catch (e) {}
+    applySettings();
+  }
+  function saveSettings() {
+    try { localStorage.setItem(SET_KEY, JSON.stringify(settings)); } catch (e) {}
+  }
+  function applySettings() {
+    var root = document.documentElement;
+    if (settings.recipe === 'auto') root.removeAttribute('data-recipe-lock');
+    else root.setAttribute('data-recipe-lock', settings.recipe);
+    if (settings.motion) root.removeAttribute('data-no-motion');
+    else root.setAttribute('data-no-motion', '');
+    if (settings.decor) root.removeAttribute('data-no-decor');
+    else root.setAttribute('data-no-decor', '');
+    window.dispatchEvent(new CustomEvent('recipeChange'));   // 天空引擎立即重算
+    syncSettingsUI();
+  }
+  function syncSettingsUI() {
+    var seg = document.getElementById('recipeSeg');
+    if (seg) Array.prototype.forEach.call(seg.querySelectorAll('button[data-v]'), function (b) {
+      b.classList.toggle('on', b.dataset.v === settings.recipe);
+    });
+    var mt = document.getElementById('motionToggle');
+    if (mt) { mt.classList.toggle('on', settings.motion); mt.setAttribute('aria-checked', String(settings.motion)); }
+    var dt = document.getElementById('decorToggle');
+    if (dt) { dt.classList.toggle('on', settings.decor); dt.setAttribute('aria-checked', String(settings.decor)); }
+    var c = document.getElementById('itemCount');
+    if (c) c.textContent = load().length;
+  }
+  function hint(msg) {
+    var el = document.getElementById('setHint');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.hidden = !msg;
+    if (msg) setTimeout(function () { if (el.textContent === msg) el.hidden = true; }, 5000);
+  }
+
+  function backupPayload() {
+    return JSON.stringify({
+      app: 'shinian', schema: 1,
+      exportedAt: new Date().toISOString(),
+      items: load()
+    });
+  }
+  function stamp() {
+    var d = new Date(), p = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
+  }
+  // 复制：优先用剪贴板 API，失败降级到隐藏 textarea
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        ok ? resolve() : reject();
+      } catch (e) { reject(e); }
+    });
+  }
+  function closeSettings() {
+    var drop = document.getElementById('settingsDrop');
+    if (!drop || drop.hidden) return;
+    var a = play(drop, [
+      { height: drop.scrollHeight + 'px', opacity: 1 },
+      { height: '0px', opacity: 0 }
+    ], { duration: 200, easing: 'ease-in' });
+    if (!a) { drop.hidden = true; return; }
+    a.onfinish = function () { drop.hidden = true; drop.style.height = ''; };
+  }
+
+  function initSettings() {
+    var btn = document.getElementById('settingsBtn');
+    var drop = document.getElementById('settingsDrop');
+    if (!btn || !drop) return;
+
+    btn.addEventListener('click', function () {
+      if (drop.hidden) {
+        // 与城市下拉互斥
+        var bar = document.getElementById('cityBar');
+        var cd = document.getElementById('cityDrop');
+        if (cd && !cd.hidden) closeDrop(cd, bar, document.getElementById('citySearch'));
+        drop.hidden = false;
+        syncSettingsUI();
+        var a = play(drop, [
+          { height: '0px', opacity: 0 },
+          { height: drop.scrollHeight + 'px', opacity: 1 }
+        ], { duration: 280, easing: EASE });
+        if (a) a.onfinish = function () { drop.style.height = ''; };
+      } else {
+        closeSettings();
+      }
+    });
+
+    // 玻璃配方
+    document.getElementById('recipeSeg').addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('button[data-v]');
+      if (!b) return;
+      settings.recipe = b.dataset.v;
+      saveSettings(); applySettings(); haptic(8);
+    });
+
+    // 两个开关
+    function bindToggle(id, key) {
+      document.getElementById(id).addEventListener('click', function () {
+        settings[key] = !settings[key];
+        saveSettings(); applySettings(); haptic(8);
+      });
+    }
+    bindToggle('motionToggle', 'motion');
+    bindToggle('decorToggle', 'decor');
+
+    // 导出 · 复制文本
+    document.getElementById('exportCopy').addEventListener('click', function () {
+      var items = load();
+      if (!items.length) { hint('还没有念想可以备份'); return; }
+      copyText(backupPayload()).then(function () {
+        hint('已复制 ' + items.length + ' 条念想的备份文本，粘到备忘录或聊天里就能存下来');
+        haptic(12);
+      }).catch(function () {
+        hint('复制失败，请改用「下载备份文件」');
+      });
+    });
+
+    // 导出 · 下载文件
+    document.getElementById('exportFile').addEventListener('click', function () {
+      var items = load();
+      if (!items.length) { hint('还没有念想可以备份'); return; }
+      try {
+        var blob = new Blob([backupPayload()], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'shinian-backup-' + stamp() + '.json';
+        // 阻止冒泡：否则会被「点击外部关闭面板」的逻辑误判，导致面板被关掉
+        a.addEventListener('click', function (e) { e.stopPropagation(); });
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        hint('已下载 shinian-backup-' + stamp() + '.json');
+        haptic(12);
+      } catch (e) { hint('下载失败：' + (e && e.message)); }
+    });
+
+    // 导入恢复（默认合并，同 id 跳过）
+    var fileInput = document.getElementById('importFile');
+    document.getElementById('importBtn').addEventListener('click', function () { fileInput.click(); });
+    fileInput.addEventListener('change', function () {
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var data = JSON.parse(String(reader.result));
+          var incoming = Array.isArray(data) ? data : (data && data.items);
+          if (!Array.isArray(incoming)) { hint('文件格式不对，无法识别'); return; }
+          var cur = load(), have = {};
+          cur.forEach(function (x) { have[x.id] = 1; });
+          var added = 0, dup = 0;
+          incoming.forEach(function (x) {
+            if (!x || !x.date) return;
+            var id = x.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+            if (have[id]) { dup++; return; }
+            have[id] = 1;
+            cur.push({ id: id, name: String(x.name || '未命名').slice(0, 30), date: x.date });
+            added++;
+          });
+          save(cur); render(); syncSettingsUI();
+          hint('导入完成：新增 ' + added + ' 条' + (dup ? '，跳过 ' + dup + ' 条重复' : ''));
+          haptic(12);
+        } catch (e) {
+          hint('导入失败：不是有效的备份 JSON');
+        }
+        fileInput.value = '';
+      };
+      reader.readAsText(f);
+    });
+
+    // 清空（二次确认）
+    document.getElementById('clearBtn').addEventListener('click', function () {
+      var n = load().length;
+      if (!n) { hint('已经没有念想了'); return; }
+      if (!window.confirm('确定清空全部 ' + n + ' 条念想吗？\n此操作不可恢复，建议先备份。')) return;
+      save([]); render(); syncSettingsUI();
+      hint('已清空全部念想');
+      haptic(12);
+    });
+  }
+
   // ---------- 天气装饰初始化 ----------
   function initWeatherEffects() {
     // 雨滴
@@ -534,6 +742,7 @@
 
   // ---------- 启动 ----------
   function boot() {
+    loadSettings();          // 先恢复设置，再渲染，避免动效闪烁
     tickClock();
     setInterval(tickClock, 1000);
     initForm();
@@ -546,6 +755,7 @@
     // 城市数据与天气异步启动，不阻塞主界面
     loadCities().then(function() {
       initCityPicker();
+      initSettings();
       initWeatherEffects();
       // 启动时拉取天气
       ShiNianWeather.fetch(currentCity).then(function(data){

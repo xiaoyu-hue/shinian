@@ -49,6 +49,45 @@
         <span class="city-chev">▾</span>
       </button>
       <button type="button" class="refresh-btn" id="refreshWeather" aria-label="刷新天气">↻</button>
+      <button type="button" class="settings-btn" id="settingsBtn" aria-label="设置与数据">⚙</button>
+
+      <!-- 设置与数据面板 -->
+      <div class="settings-drop" id="settingsDrop" hidden>
+        <div class="set-block">
+          <div class="set-label">玻璃配方</div>
+          <div class="set-seg" id="recipeSeg" role="group" aria-label="玻璃配方">
+            <button type="button" data-v="auto" class="on">跟随天空</button>
+            <button type="button" data-v="light">亮</button>
+            <button type="button" data-v="dark">暗</button>
+          </div>
+        </div>
+
+        <div class="set-block">
+          <label class="set-row" for="motionToggle">
+            <span>微交互</span>
+            <button type="button" class="set-toggle on" id="motionToggle"
+                    role="switch" aria-checked="true" aria-label="微交互"></button>
+          </label>
+          <label class="set-row" for="decorToggle">
+            <span>天气装饰层</span>
+            <button type="button" class="set-toggle on" id="decorToggle"
+                    role="switch" aria-checked="true" aria-label="天气装饰层"></button>
+          </label>
+        </div>
+
+        <div class="set-block">
+          <div class="set-label">数据 · 共 <span id="itemCount">0</span> 条念想</div>
+          <div class="set-actions">
+            <button type="button" class="set-btn" id="exportCopy">复制备份文本</button>
+            <button type="button" class="set-btn" id="exportFile">下载备份文件</button>
+            <button type="button" class="set-btn" id="importBtn">导入恢复</button>
+            <button type="button" class="set-btn danger" id="clearBtn">清空全部</button>
+          </div>
+          <input type="file" id="importFile" accept="application/json,.json" hidden>
+          <p class="set-hint" id="setHint" hidden></p>
+        </div>
+      </div>
+
       <div class="city-drop" id="cityDrop" hidden>
         <input type="text" class="city-search" id="citySearch" placeholder="搜索城市…" autocomplete="off">
         <ul class="city-list" id="cityList"></ul>
