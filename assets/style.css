@@ -29,6 +29,12 @@
   --radius: 20px;
   --dur-fast: 140ms;
   --dur-base: 240ms;
+  --dur-sky: 700ms;      /* 天空与玻璃配方切换：放慢，才像「流动」而不是「跳变」 */
+
+  /* 弹簧回弹曲线：linear() 采样点模拟阻尼弹簧（Chrome113+/Safari17.2+/Firefox112+）
+     按下 90ms 快收，松开时用它回弹 —— 无需任何动画库 */
+  --spring: linear(0, .38 6.5%, .78 12.5%, 1.18 19%, 1.28 22.5%,
+                  1.06 30%, .94 36%, 1.02 46%, .99 56%, 1);
   --ease-out: cubic-bezier(.22, 1, .36, 1);
   --maxw: 430px;
 }
@@ -61,7 +67,7 @@ body {
   font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   color: var(--text);
   background: linear-gradient(178deg, var(--sky-top) 0%, var(--sky-bottom) 100%) fixed;
-  transition: background var(--dur-base) var(--ease-out);
+  transition: background var(--dur-sky) var(--ease-out);
   -webkit-font-smoothing: antialiased;
   /* 移动端：去掉点击时的默认蓝色高亮块；禁止下拉触发浏览器刷新 */
   -webkit-tap-highlight-color: transparent;
@@ -84,13 +90,32 @@ main {
 /* ---- 天空舞台（背景装饰层） ---- */
 .sky { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
 
+/* 光晕：transform 由 sky.js 按时刻设定（模拟太阳轨迹），
+   translate 是独立的缓慢漂浮，两者叠加 → 天空「活着」 */
 .orb { position: absolute; border-radius: 50%; filter: blur(50px);
        background: radial-gradient(circle, var(--sky-glow), transparent 70%);
-       opacity: .8; transition: opacity 1.2s; }
+       opacity: .8; transition: opacity 1.2s;
+       transform: translate3d(var(--orb-x, 0px), var(--orb-y, 0px), 0);
+       animation: orbFloat 26s ease-in-out infinite; }
+@keyframes orbFloat {
+  0%, 100% { translate: 0 0; }
+  50%      { translate: 16px -12px; }
+}
 .orb-a { width: 340px; height: 340px; top: -80px; left: -90px; }
-.orb-b { width: 420px; height: 420px; bottom: -120px; right: -120px; opacity: .5; }
+.orb-b { width: 420px; height: 420px; bottom: -120px; right: -120px; opacity: .5;
+         animation-duration: 34s; animation-direction: reverse; }
 
 .stars { position: absolute; inset: 0; opacity: var(--stars-o); transition: opacity 2s; }
+
+/* 星空随页面滚动轻微上移，制造纵深（仅支持滚动驱动动画的浏览器启用） */
+@supports (animation-timeline: scroll()) {
+  .stars {
+    animation: starsDrift linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 120vh;
+  }
+  @keyframes starsDrift { to { transform: translateY(-72px); } }
+}
 .stars i { position: absolute; width: 2px; height: 2px; border-radius: 50%;
            background: #dcecf8; animation: twinkle 3.2s ease-in-out infinite; }
 @keyframes twinkle { 50% { opacity: .25; } }
@@ -103,8 +128,8 @@ main {
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  transition: background var(--dur-base) var(--ease-out),
-              border-color var(--dur-base) var(--ease-out);
+  transition: background var(--dur-sky) var(--ease-out),
+              border-color var(--dur-sky) var(--ease-out);
 }
 
 .card { padding: 20px 18px; }
@@ -224,8 +249,9 @@ main {
 
 /* ---- 天气显示行 ---- */
 .weather-line { margin-top: 8px; font-size: 14px; color: var(--text-dim); }
-.weather-icon { font-size: 16px; margin-right: 4px; vertical-align: middle; }
-.weather-temp { font-weight: 500; vertical-align: middle; }
+/* inline-block：让天气图标与温度能做缩放动画（inline 元素不支持 transform） */
+.weather-icon { font-size: 16px; margin-right: 4px; vertical-align: middle; display: inline-block; }
+.weather-temp { font-weight: 500; vertical-align: middle; display: inline-block; }
 
 /* ---- 天气装饰层（全局天空叠加） ---- */
 .weather-layer {
@@ -324,14 +350,39 @@ input[type="date"] { color-scheme: dark; }
 /* 倒数日列表 */
 .cd-list { list-style: none; display: grid; gap: 10px; }
 
-.cd-item { display: flex; align-items: center; gap: 14px; padding: 16px 18px;
-           animation: cardIn .5s var(--ease-out) both; }
-.cd-item:nth-child(1) { animation-delay: .05s; }
-.cd-item:nth-child(2) { animation-delay: .1s; }
-.cd-item:nth-child(3) { animation-delay: .15s; }
-.cd-item:nth-child(4) { animation-delay: .2s; }
-.cd-item:nth-child(5) { animation-delay: .25s; }
-.cd-item:nth-child(n+6) { animation-delay: .3s; }
+/* 倒数日条目：外层 .cd-item 是容器（承载滑动删除），
+   内层 .cd-body 才是玻璃卡本身。进出场改由 JS 精确控制，
+   这样新增的才是新增、移动的才是移动，不会整列表重播一遍 */
+.cd-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  touch-action: pan-y;        /* 纵向留给页面滚动，横向留给滑动删除 */
+}
+.cd-body {
+  position: relative;
+  display: flex; align-items: center; gap: 14px; padding: 16px 18px;
+  transition: transform 340ms var(--spring),
+              background var(--dur-sky) var(--ease-out),
+              border-color var(--dur-sky) var(--ease-out);
+}
+/* 按压反馈：按下 90ms 快速收拢，松开交给弹簧回弹 */
+.cd-body:active {
+  transform: scale(.972);
+  transition-duration: 90ms;
+  transition-timing-function: ease-out;
+}
+/* 左滑时露出的删除底层 */
+.cd-swipe {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 22px;
+  background: rgba(199, 136, 130, .18);
+  color: var(--danger);
+  font-size: 13px; letter-spacing: .12em;
+  opacity: 0; transition: opacity 160ms ease-out;
+}
+.cd-item.swiping .cd-swipe { opacity: 1; }
 
 /* 卡片入场共用 */
 @keyframes cardIn {
@@ -345,7 +396,8 @@ input[type="date"] { color-scheme: dark; }
 .cd-sub { font-size: 12.5px; color: var(--text-faint); margin-top: 3px; }
 
 .cd-days { display: flex; align-items: baseline; justify-content: flex-end;
-           gap: 5px; text-align: right; flex-shrink: 0; white-space: nowrap; }
+           gap: 5px; text-align: right; flex-shrink: 0; white-space: nowrap;
+           perspective: 420px;   /* 让天数数字的翻转有立体感 */ }
 .cd-days .n { font-size: 26px; font-weight: 300; line-height: 1;
               font-variant-numeric: tabular-nums; }
 .cd-days .n:only-child { font-size: 17px; font-weight: 500; color: var(--accent); }
@@ -424,7 +476,7 @@ input[type="date"] { color-scheme: dark; }
   .card { padding: 16px 14px; }
   /* 倒数日卡片改两行：名字独占一行，天数与按钮在第二行。
      这样既保住 44px 触控区，又不会把名字挤成一串省略号 */
-  .cd-item { flex-wrap: wrap; gap: 8px; padding: 14px 12px; }
+  .cd-body { flex-wrap: wrap; gap: 8px; padding: 14px 12px; }
   .cd-info { flex: 1 0 100%; }
   .cd-days { margin-right: auto; }
   .cd-days .n { font-size: 23px; }

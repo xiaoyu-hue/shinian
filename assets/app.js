@@ -8,6 +8,51 @@
 
   var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 
+  // ============================================================
+  // 动效工具：全部基于原生 Web Animations API，零依赖
+  // 统一尊重系统「减弱动态效果」设置，老浏览器静默跳过
+  // ============================================================
+  var EASE = 'cubic-bezier(.2,.8,.2,1)';
+
+  function motionOK() {
+    try { return !window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch (e) { return true; }
+  }
+  function play(el, frames, opts) {
+    if (!el || !el.animate || !motionOK()) return null;
+    try { return el.animate(frames, opts); } catch (e) { return null; }
+  }
+  // 位置补间（FLIP 的 Invert+Play 一步）
+  function glide(el, dy) {
+    return play(el, [{ transform: 'translateY(' + dy + 'px)' }, { transform: 'none' }],
+                { duration: 320, easing: EASE });
+  }
+  // 新条目入场
+  function enter(el, delay) {
+    return play(el,
+      [{ opacity: 0, transform: 'translateY(12px) scale(.985)' }, { opacity: 1, transform: 'none' }],
+      { duration: 420, delay: delay || 0, easing: EASE, fill: 'backwards' });
+  }
+  // 天数变化：沿 X 轴翻转
+  function flipNumber(el) {
+    return play(el, [
+      { transform: 'rotateX(0deg)', opacity: 1 },
+      { transform: 'rotateX(-88deg)', opacity: .2, offset: .5 },
+      { transform: 'rotateX(0deg)', opacity: 1 }
+    ], { duration: 460, easing: EASE });
+  }
+  // 图标 / 温度等小元素弹出
+  function popIn(el) {
+    return play(el, [
+      { opacity: 0, transform: 'scale(.86) rotate(-8deg)' },
+      { opacity: 1, transform: 'none' }
+    ], { duration: 420, easing: EASE });
+  }
+  // 触觉反馈（安卓 Chrome 支持；iOS Safari 无此 API，静默跳过）
+  function haptic(ms) {
+    try { if (navigator.vibrate) navigator.vibrate(ms || 12); } catch (e) {}
+  }
+
   // ---------- 时钟 ----------
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   var currentDateStr = '';
@@ -58,10 +103,20 @@
     return (+p[1]) + '月' + (+p[2]) + '日 · 星期' + WEEK[d.getDay()];
   }
 
+  var hasRendered = false;   // 区分「首屏入场」与「后续新增」
+  var lastDiffs = {};        // 上次渲染的天数，用于判断数字是否需要翻转
+
   function render() {
     var items = load();
     var list = document.getElementById('cdList');
     var empty = document.getElementById('cdEmpty');
+
+    // FLIP · First：重建前先记下每条的位置
+    var firstTop = {};
+    Array.prototype.forEach.call(list.querySelectorAll('.cd-item'), function (el) {
+      if (el.dataset.id) firstTop[el.dataset.id] = el.getBoundingClientRect().top;
+    });
+
     list.innerHTML = '';
 
     empty.hidden = items.length > 0;
@@ -73,12 +128,13 @@
       return da - db;
     });
 
-    items.forEach(function (item) {
+    items.forEach(function (item, idx) {
       var diff = dayDiff(item.date);
       var li = document.createElement('li');
-      li.className = 'cd-item glass card' +
+      li.className = 'cd-item' +
         (diff === 0 ? ' is-today' : '') +
         (diff < 0 ? ' is-past' : '');
+      li.dataset.id = item.id;
 
       var daysHtml;
       if (diff === 0) {
@@ -90,15 +146,21 @@
       }
 
       li.innerHTML =
-        '<div class="cd-info">' +
-          '<div class="cd-name"></div>' +
-          '<div class="cd-sub">' + fmtDate(item.date) + '</div>' +
-        '</div>' +
-        '<div class="cd-days">' + daysHtml + '</div>' +
-        '<button type="button" class="cd-edit" aria-label="编辑 ' + item.name.replace(/"/g, '') + '"></button>' +
-        '<button type="button" class="cd-del" aria-label="删除 ' + item.name.replace(/"/g, '') + '">✕</button>';
+        '<div class="cd-swipe" aria-hidden="true">松开删除</div>' +
+        '<div class="cd-body glass card">' +
+          '<div class="cd-info">' +
+            '<div class="cd-name"></div>' +
+            '<div class="cd-sub">' + fmtDate(item.date) + '</div>' +
+          '</div>' +
+          '<div class="cd-days">' + daysHtml + '</div>' +
+          '<button type="button" class="cd-edit"></button>' +
+          '<button type="button" class="cd-del">✕</button>' +
+        '</div>';
 
       li.querySelector('.cd-name').textContent = item.name;
+      // 用 setAttribute 而非拼字符串，避免名字里的特殊字符破坏属性
+      li.querySelector('.cd-edit').setAttribute('aria-label', '编辑 ' + item.name);
+      li.querySelector('.cd-del').setAttribute('aria-label', '删除 ' + item.name);
 
       li.querySelector('.cd-edit').addEventListener('click', function () {
         document.getElementById('cdName').value = item.name;
@@ -110,12 +172,90 @@
       });
 
       li.querySelector('.cd-del').addEventListener('click', function () {
-        save(load().filter(function (x) { return x.id !== item.id; }));
-        render();
+        removeItem(item.id, li);
       });
 
+      initSwipe(li, item.id);
       list.appendChild(li);
+
+      // FLIP · Last：与旧位置比对，位移的补间、新增的入场
+      var body = li.querySelector('.cd-body');
+      var nowTop = li.getBoundingClientRect().top;
+      if (firstTop.hasOwnProperty(item.id)) {
+        var dy = firstTop[item.id] - nowTop;
+        if (Math.abs(dy) > 1) glide(body, dy);
+        // 天数变了才翻转数字，避免每次刷新都翻
+        if (lastDiffs[item.id] !== undefined && lastDiffs[item.id] !== diff) {
+          flipNumber(li.querySelector('.cd-days'));
+        }
+      } else if (hasRendered) {
+        enter(body);
+      } else {
+        enter(body, Math.min(idx, 5) * 55);   // 首屏逐条错开
+      }
+      lastDiffs[item.id] = diff;
     });
+
+    hasRendered = true;
+  }
+
+  // 删除：高度收拢 + 淡出，结束后其余条目由 render 的 FLIP 平滑上移
+  function removeItem(id, li) {
+    if (li.dataset.removing) return;      // 防止动画期间重复触发
+    li.dataset.removing = '1';
+    haptic(10);
+    // 数据立刻落库：连续快速删除、或动画途中刷新页面都不会出错
+    save(load().filter(function (x) { return x.id !== id; }));
+    var finish = function () { render(); };
+    var anim = play(li, [
+      { height: li.offsetHeight + 'px', opacity: 1, transform: 'none' },
+      { height: '0px', opacity: 0, transform: 'translateX(20px)' }
+    ], { duration: 250, easing: 'ease-in' });
+    if (!anim) { finish(); return; }
+    anim.onfinish = finish;
+  }
+
+  // 滑动删除（仅触摸设备；鼠标仍用 ✕ 按钮，避免误触）
+  function initSwipe(li, id) {
+    var MAX = 130, THRESHOLD = 72;
+    var body = li.querySelector('.cd-body');
+    var startX = 0, startY = 0, dx = 0, active = false, axis = null;
+
+    li.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'touch') return;
+      startX = e.clientX; startY = e.clientY; dx = 0; active = true; axis = null;
+      try { li.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+
+    li.addEventListener('pointermove', function (e) {
+      if (!active) return;
+      var ddx = e.clientX - startX, ddy = e.clientY - startY;
+      if (axis === null) {
+        if (Math.abs(ddx) < 6 && Math.abs(ddy) < 6) return;
+        // 判定主轴：纵向则交还给页面滚动
+        axis = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y';
+        if (axis === 'y') { active = false; return; }
+        li.classList.add('swiping');
+      }
+      dx = Math.max(-MAX, Math.min(0, ddx));   // 只允许左滑
+      body.style.transition = 'none';
+      body.style.transform = 'translateX(' + dx + 'px)';
+    });
+
+    function end() {
+      if (!active) return;
+      active = false;
+      li.classList.remove('swiping');
+      body.style.transition = '';              // 交回 CSS 弹簧过渡
+      if (dx <= -THRESHOLD) {
+        body.style.transform = 'translateX(-' + MAX + 'px)';
+        removeItem(id, li);
+      } else {
+        body.style.transform = '';             // 未达阈值，弹回原位
+      }
+    }
+    li.addEventListener('pointerup', end);
+    li.addEventListener('pointercancel', end);
   }
 
   function initForm() {
@@ -152,6 +292,7 @@
       }
       save(items);
       name.value = '';
+      haptic(14);          // 记下念想时轻微震动一下（安卓）
       render();
     });
 
@@ -207,12 +348,36 @@
       if (currentCity && c.name === currentCity.name) li.className = 'selected';
       li.addEventListener('click', function(){
         saveCity(c);
-        document.getElementById('cityDrop').hidden = true;
-        document.getElementById('cityBar').classList.remove('open');
-        document.getElementById('citySearch').value = '';
+        closeDrop(document.getElementById('cityDrop'),
+                  document.getElementById('cityBar'),
+                  document.getElementById('citySearch'));
       });
       list.appendChild(li);
     });
+  }
+
+  // 城市下拉：展开 / 收起带高度动画（不支持的浏览器直接切换，不会报错）
+  function openDrop(drop, bar, search) {
+    drop.hidden = false;
+    bar.classList.add('open');
+    renderCityList();
+    search.focus();
+    var anim = play(drop, [
+      { height: '0px', opacity: 0 },
+      { height: drop.scrollHeight + 'px', opacity: 1 }
+    ], { duration: 280, easing: EASE });
+    if (anim) anim.onfinish = function () { drop.style.height = ''; };
+  }
+  function closeDrop(drop, bar, search) {
+    if (drop.hidden) return;
+    bar.classList.remove('open');
+    if (search) search.value = '';
+    var anim = play(drop, [
+      { height: drop.scrollHeight + 'px', opacity: 1 },
+      { height: '0px', opacity: 0 }
+    ], { duration: 200, easing: 'ease-in' });
+    if (!anim) { drop.hidden = true; return; }
+    anim.onfinish = function () { drop.hidden = true; drop.style.height = ''; };
   }
 
   function initCityPicker() {
@@ -226,10 +391,8 @@
     var btn = document.getElementById('cityBtn');
 
     btn.addEventListener('click', function(){
-      var open = !drop.hidden;
-      drop.hidden = open;
-      if (open) { bar.classList.remove('open'); }
-      else { bar.classList.add('open'); renderCityList(); search.focus(); }
+      if (drop.hidden) { openDrop(drop, bar, search); }
+      else { closeDrop(drop, bar, search); }
     });
 
     search.addEventListener('input', function(){
@@ -238,11 +401,7 @@
 
     // 点击外部关闭
     document.addEventListener('click', function(e){
-      if (!bar.contains(e.target)) {
-        drop.hidden = true;
-        bar.classList.remove('open');
-        search.value = '';
-      }
+      if (!bar.contains(e.target)) { closeDrop(drop, bar, search); }
     });
 
     document.getElementById('refreshWeather').addEventListener('click', refreshWeather);
@@ -277,8 +436,12 @@
     }
 
     var code = weatherData.weatherCode;
+    var prevIcon = icon.textContent, prevTemp = temp.textContent;
     icon.textContent = WEATHER_ICONS[code] || '🌤';
     temp.textContent = Math.round(weatherData.temperature) + '°';
+    // 只在真正变化时才播放，避免每分钟重绘都闪一下
+    if (prevIcon && prevIcon !== icon.textContent) popIn(icon);
+    if (prevTemp && prevTemp !== temp.textContent) popIn(temp);
 
     // 天气代码 → data-weather 属性（驱动 CSS 装饰层）
     var weatherType = 'clear';

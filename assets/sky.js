@@ -146,6 +146,20 @@
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', hexStr(top));
 
+    // 光晕随时刻缓慢位移：日出偏东、正午当头、日落偏西，夜里回到另一侧
+    var orbA = document.querySelector('.orb-a');
+    var orbB = document.querySelector('.orb-b');
+    if (orbA) {
+      var a1 = ((h - 6) / 24) * Math.PI * 2;
+      orbA.style.setProperty('--orb-x', (Math.sin(a1) * 64).toFixed(1) + 'px');
+      orbA.style.setProperty('--orb-y', (-Math.cos(a1) * 34).toFixed(1) + 'px');
+    }
+    if (orbB) {
+      var a2 = ((h - 18) / 24) * Math.PI * 2;   // 与主光晕错开半天
+      orbB.style.setProperty('--orb-x', (Math.sin(a2) * -52).toFixed(1) + 'px');
+      orbB.style.setProperty('--orb-y', (-Math.cos(a2) * 28).toFixed(1) + 'px');
+    }
+
     // 亮度联动玻璃配方（PRD 2.2/2.3：白天天空 → 亮配方深字）
     var recipe = lum(bottom) > 0.42 ? 'light' : 'dark';
     document.documentElement.setAttribute('data-recipe', recipe);
