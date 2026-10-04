@@ -10,6 +10,7 @@
 
   // ---------- 时钟 ----------
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  var currentDateStr = '';
 
   function tickClock() {
     var d = new Date();
@@ -20,6 +21,11 @@
       d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日 · 星期' + WEEK[d.getDay()];
     var phase = document.documentElement.style.getPropertyValue('--phase-name');
     document.getElementById('phaseName').textContent = phase || '时念';
+
+    // 跨天检测：日期变化时刷新倒数日天数
+    var ds = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    if (currentDateStr && ds !== currentDateStr) { render(); }
+    currentDateStr = ds;
   }
 
   // ---------- 倒数日 ----------
