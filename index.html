@@ -39,7 +39,10 @@
                placeholder="记一个念想（如：回家 / 生日 / 出发）" autocomplete="off">
         <label class="sr-only" for="cdDate">日期</label>
         <input id="cdDate" name="date" type="date" required>
-        <button type="submit" class="btn">记下这个日子</button>
+        <div class="form-actions">
+          <button type="submit" class="btn" id="cdSubmit">记下这个日子</button>
+          <button type="button" class="btn-cancel" id="cdCancel" hidden>取消编辑</button>
+        </div>
       </form>
 
       <ul id="cdList" class="cd-list"></ul>

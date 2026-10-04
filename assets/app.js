@@ -30,6 +30,7 @@
 
   // ---------- 倒数日 ----------
   var KEY = 'shinian.items.v1';
+  var editingId = null;
 
   function load() {
     try {
@@ -94,9 +95,19 @@
           '<div class="cd-sub">' + fmtDate(item.date) + '</div>' +
         '</div>' +
         '<div class="cd-days">' + daysHtml + '</div>' +
+        '<button type="button" class="cd-edit" aria-label="编辑 ' + item.name.replace(/"/g, '') + '"></button>' +
         '<button type="button" class="cd-del" aria-label="删除 ' + item.name.replace(/"/g, '') + '">✕</button>';
 
       li.querySelector('.cd-name').textContent = item.name;
+
+      li.querySelector('.cd-edit').addEventListener('click', function () {
+        document.getElementById('cdName').value = item.name;
+        document.getElementById('cdDate').value = item.date;
+        document.getElementById('cdSubmit').textContent = '更新这个日子';
+        document.getElementById('cdCancel').hidden = false;
+        editingId = item.id;
+        document.getElementById('cdName').focus();
+      });
 
       li.querySelector('.cd-del').addEventListener('click', function () {
         save(load().filter(function (x) { return x.id !== item.id; }));
@@ -111,6 +122,8 @@
     var form = document.getElementById('cdForm');
     var name = document.getElementById('cdName');
     var date = document.getElementById('cdDate');
+    var submitBtn = document.getElementById('cdSubmit');
+    var cancelBtn = document.getElementById('cdCancel');
 
     // 日期默认值：今天
     var d = new Date();
@@ -119,14 +132,34 @@
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var items = load();
-      items.push({
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        name: name.value.trim(),
-        date: date.value
-      });
+      if (editingId) {
+        // 编辑模式：更新已有条目
+        var idx = items.findIndex(function (x) { return x.id === editingId; });
+        if (idx !== -1) {
+          items[idx].name = name.value.trim();
+          items[idx].date = date.value;
+        }
+        editingId = null;
+        submitBtn.textContent = '记下这个日子';
+        cancelBtn.hidden = true;
+      } else {
+        // 新增模式
+        items.push({
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          name: name.value.trim(),
+          date: date.value
+        });
+      }
       save(items);
       name.value = '';
       render();
+    });
+
+    cancelBtn.addEventListener('click', function () {
+      editingId = null;
+      name.value = '';
+      submitBtn.textContent = '记下这个日子';
+      cancelBtn.hidden = true;
     });
   }
 
