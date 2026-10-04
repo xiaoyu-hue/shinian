@@ -262,6 +262,14 @@
     var temp = document.getElementById('weatherTemp');
     var root = document.documentElement;
 
+    // 刷新按钮始终可见：断网/请求失败时用户仍可手动重试
+    var refreshBtn = document.getElementById('refreshWeather');
+    if (refreshBtn) {
+      refreshBtn.hidden = false;
+      refreshBtn.textContent = '↻';
+      refreshBtn.title = weatherData ? '刷新天气' : '天气获取失败，点击重试';
+    }
+
     if (!weatherData) {
       line.hidden = true;
       root.removeAttribute('data-weather');
@@ -368,6 +376,10 @@
     initForm();
     initPerfMonitor();
     render();
+    // 网络恢复后自动重试天气（PLAN v0.2 · Phase 4 断网降级链路）
+    window.addEventListener('online', function () {
+      if (currentCity) refreshWeather();
+    });
     // 城市数据与天气异步启动，不阻塞主界面
     loadCities().then(function() {
       initCityPicker();
