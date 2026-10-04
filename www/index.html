@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04111d">
+<title>时念 · ShiNian</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/sky.js" defer></script>
+<script src="assets/weather.js" defer></script>
+<script src="assets/app.js" defer></script>
+</head>
+<body>
+  <!-- 天空舞台：背景由天空引擎驱动 -->
+  <div class="sky" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="stars" id="stars" aria-hidden="true"></div>
+  </div>
+
+  <!-- 天气装饰层 -->
+  <div class="weather-layer" aria-hidden="true"></div>
+  <div class="rain-canvas" id="rainCanvas" aria-hidden="true"></div>
+  <div class="snow-canvas" id="snowCanvas" aria-hidden="true"></div>
+
+  <main>
+    <!-- 左列容器：手机上是普通竖排；宽屏/横屏时与时钟同列 -->
+    <div class="col-left">
+      <!-- 时钟卡 -->
+      <section class="hero">
+      <div class="glass clock-card" role="group" aria-label="当前时间">
+        <div class="eyebrow" id="phaseName">—</div>
+        <div class="clock" id="clock" aria-hidden="true">
+          <span id="hh">--</span><span class="colon">:</span><span id="mm">--</span><span class="sec" id="ss">--</span>
+        </div>
+        <div class="date-line" id="dateLine">载入中…</div>
+        <div class="weather-line" id="weatherLine" hidden>
+          <span class="weather-icon" id="weatherIcon"></span>
+          <span class="weather-temp" id="weatherTemp"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 城市选择 -->
+    <div class="city-bar" id="cityBar">
+      <button type="button" class="city-btn" id="cityBtn" aria-label="选择城市">
+        <span class="city-pin">📍</span>
+        <span class="city-label" id="cityLabel">北京</span>
+        <span class="city-chev">▾</span>
+      </button>
+      <button type="button" class="refresh-btn" id="refreshWeather" aria-label="刷新天气">↻</button>
+      <button type="button" class="settings-btn" id="settingsBtn" aria-label="设置与数据">⚙</button>
+
+      <!-- 设置与数据面板 -->
+      <div class="settings-drop" id="settingsDrop" hidden>
+        <div class="set-block">
+          <div class="set-label">玻璃配方</div>
+          <div class="set-seg" id="recipeSeg" role="group" aria-label="玻璃配方">
+            <button type="button" data-v="auto" class="on">跟随天空</button>
+            <button type="button" data-v="light">亮</button>
+            <button type="button" data-v="dark">暗</button>
+          </div>
+        </div>
+
+        <div class="set-block">
+          <label class="set-row" for="motionToggle">
+            <span>微交互</span>
+            <button type="button" class="set-toggle on" id="motionToggle"
+                    role="switch" aria-checked="true" aria-label="微交互"></button>
+          </label>
+          <label class="set-row" for="decorToggle">
+            <span>天气装饰层</span>
+            <button type="button" class="set-toggle on" id="decorToggle"
+                    role="switch" aria-checked="true" aria-label="天气装饰层"></button>
+          </label>
+        </div>
+
+        <div class="set-block">
+          <div class="set-label">数据 · 共 <span id="itemCount">0</span> 条念想</div>
+          <div class="set-actions">
+            <button type="button" class="set-btn" id="exportCopy">复制备份文本</button>
+            <button type="button" class="set-btn" id="exportFile">下载备份文件</button>
+            <button type="button" class="set-btn" id="importBtn">导入恢复</button>
+            <button type="button" class="set-btn danger" id="clearBtn">清空全部</button>
+          </div>
+          <input type="file" id="importFile" accept="application/json,.json" hidden>
+          <p class="set-hint" id="setHint" hidden></p>
+        </div>
+      </div>
+
+      <div class="city-drop" id="cityDrop" hidden>
+        <input type="text" class="city-search" id="citySearch" placeholder="搜索城市…" autocomplete="off">
+        <ul class="city-list" id="cityList"></ul>
+      </div>
+    </div>
+    </div>
+
+    <!-- 倒数日 -->
+    <section class="countdown" aria-label="倒数日">
+      <h2 class="section-title">念想 · 倒数日</h2>
+
+      <form id="cdForm" class="glass card form-card">
+        <label class="sr-only" for="cdName">念想的名字</label>
+        <input id="cdName" name="name" type="text" required maxlength="30"
+               placeholder="记一个念想（如：回家 / 生日 / 出发）" autocomplete="off">
+        <label class="sr-only" for="cdDate">日期</label>
+        <input id="cdDate" name="date" type="date" required>
+        <div class="form-actions">
+          <button type="submit" class="btn" id="cdSubmit">记下这个日子</button>
+          <button type="button" class="btn-cancel" id="cdCancel" hidden>取消编辑</button>
+        </div>
+      </form>
+
+      <ul id="cdList" class="cd-list"></ul>
+
+      <div id="cdEmpty" class="glass card empty" hidden>
+        还没有念想。挑一个日子——生日、约定，或者任何你在等的东西。
+      </div>
+    </section>
+
+    <footer class="foot">时念 · ShiNian</footer>
+  </main>
+</body>
+</html>

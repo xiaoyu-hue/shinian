@@ -4,7 +4,7 @@
   "description": "时念 ShiNian — 活着的窗景：天空随时刻与四季流动的时间工具",
   "private": true,
   "scripts": {
-    "build": "mkdir -p www && cp index.html www/ && cp -r assets www/",
+    "build": "mkdir -p www && cp index.html www/ && cp -r assets www/ && cp -r data www/",
     "cap:add": "npx cap add android",
     "cap:sync": "npx cap sync android"
   },
