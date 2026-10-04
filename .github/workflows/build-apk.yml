@@ -39,6 +39,15 @@ jobs:
 
       - name: 上传 APK 到 v0.1.0 Release
         run: |
-          gh release upload v0.1.0 android/app/build/outputs/apk/debug/app-debug.apk --clobber
+          RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/v0.1.0 \
+            | jq -r '.id')
+          echo "Release ID: $RELEASE_ID"
+          curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @android/app/build/outputs/apk/debug/app-debug.apk \
+            "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=时念-ShiNian-v0.1.0.apk" \
+            | jq -r '.browser_download_url'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
