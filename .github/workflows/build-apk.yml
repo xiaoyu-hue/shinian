@@ -15,11 +15,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: 设置 Java 17
+      - name: 设置 Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: 安装依赖
         run: npm install
@@ -33,11 +33,15 @@ jobs:
       - name: 同步 Web 资源到 Android
         run: npx cap sync android
 
+      - name: 调试 — 检查 Android 目录
+        run: ls -la android/ && ls -la android/gradlew && cat android/gradle/wrapper/gradle-wrapper.properties
+
       - name: 构建 Debug APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug
+        run: bash gradlew assembleDebug --no-daemon
 
       - name: 上传 APK 到 v0.1.0 Release
+        if: success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.1.0
