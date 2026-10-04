@@ -31,7 +31,14 @@
 
 ## 🌐 在线体验
 
-🔗 [xiaoyu-hue.github.io/shinian](https://xiaoyu-hue.github.io/shinian/)
+| 站点 | 地址 | 说明 |
+|---|---|---|
+| **主站** | [shinian520.pages.dev](https://shinian520.pages.dev/) | 正式服务地址，**日常请使用这一个** |
+| **备用副站**（镜像） | [xiaoyu-hue.github.io/shinian](https://xiaoyu-hue.github.io/shinian/) | GitHub Pages 自动部署，仅用于主站不可达时应急 |
+
+> ⚠️ **两个站的数据不互通**：你的念想存在设备浏览器里，且**按网址分开存放**。
+> 在主站记下的念想，打开备用站是看不到的（反之亦然）——这不是数据丢失，回到原来那个网址就能看到。
+> 建议固定用主站，只在主站打不开时才临时用备用站。
 
 ## 🎨 设计语言：液态玻璃 × 四季 × 时刻
 

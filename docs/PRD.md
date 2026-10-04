@@ -9,7 +9,7 @@
 | 作者 | xiaoyu-hue |
 | 创建日期 | 2026-10-04 |
 | 最后更新 | 2026-10-04 |
-| 交付版本 | [v0.1.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.1.0) · [在线体验](https://xiaoyu-hue.github.io/shinian/) |
+| 交付版本 | [v0.1.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.1.0) · [主站](https://shinian520.pages.dev/) · [备用副站](https://xiaoyu-hue.github.io/shinian/) |
 | 关联文档 | [PLAN.md](./PLAN.md)（v0.1 执行计划）、主站 `docs/DESIGN_CONTRACT.md`（视觉令牌体系的源头） |
 
 ---
