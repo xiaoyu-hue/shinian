@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04111d">
+<title>时念 · 一方活着的窗景</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/sky.js" defer></script>
+<script src="assets/app.js" defer></script>
+</head>
+<body>
+  <!-- 天空舞台：背景由天空引擎驱动 -->
+  <div class="sky" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="stars" id="stars" aria-hidden="true"></div>
+  </div>
+
+  <main>
+    <!-- 时钟卡 -->
+    <section class="hero">
+      <div class="glass clock-card" role="group" aria-label="当前时间">
+        <div class="eyebrow" id="phaseName">—</div>
+        <div class="clock" id="clock" aria-hidden="true">
+          <span id="hh">--</span><span class="colon">:</span><span id="mm">--</span><span class="sec" id="ss">--</span>
+        </div>
+        <div class="date-line" id="dateLine">载入中…</div>
+      </div>
+    </section>
+
+    <!-- 倒数日 -->
+    <section class="countdown" aria-label="倒数日">
+      <h2 class="section-title">念想 · 倒数日</h2>
+
+      <form id="cdForm" class="glass card form-card">
+        <label class="sr-only" for="cdName">念想的名字</label>
+        <input id="cdName" name="name" type="text" required maxlength="30"
+               placeholder="记一个念想（如：回家 / 生日 / 出发）" autocomplete="off">
+        <label class="sr-only" for="cdDate">日期</label>
+        <input id="cdDate" name="date" type="date" required>
+        <button type="submit" class="btn">记下这个日子</button>
+      </form>
+
+      <ul id="cdList" class="cd-list"></ul>
+
+      <div id="cdEmpty" class="glass card empty" hidden>
+        还没有念想。挑一个日子——生日、约定，或者任何你在等的东西。
+      </div>
+    </section>
+
+    <footer class="foot">时念 ShiNian · 数据只存在这台设备里，不联网、不上传</footer>
+  </main>
+</body>
+</html>

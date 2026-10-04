@@ -1,0 +1,209 @@
+/* ============================================================
+   时念 · 样式层
+   约定：本文件不硬编码天空颜色——所有随时间变化的量都是 CSS 变量，
+   由 sky.js 每分钟写入 :root。本文件只消费变量。
+   ============================================================ */
+
+:root {
+  /* ---- 天空引擎输出接口（默认值 = 深夜，sky.js 会覆盖） ---- */
+  --sky-top: #04101c;
+  --sky-bottom: #0a3050;
+  --sky-glow: rgba(109, 161, 212, .30);
+  --stars-o: 1;              /* 星星层透明度：白天为 0 */
+  --recipe: dark;            /* dark | light，玻璃与文字配方 */
+
+  /* ---- 玻璃配方（暗 · 常态）——“更薄更透”版 ---- */
+  --glass-bg: rgba(205, 232, 250, .055);
+  --glass-bg-strong: rgba(205, 232, 250, .085);
+  --glass-border: rgba(150, 210, 255, .15);
+  --glass-shadow: 0 16px 40px rgba(2, 10, 18, .35);
+  --hairline: rgba(150, 210, 255, .12);
+  --text: #dfeaf2;
+  --text-dim: #9db4c4;
+  --text-faint: #6f8ba1;
+
+  /* ---- 结构令牌 ---- */
+  --accent: #6da1d4;
+  --accent-soft: rgba(109, 161, 212, .18);
+  --danger: #c78882;
+  --radius: 20px;
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --maxw: 430px;
+}
+
+/* 亮配方（白天的玻璃与文字），由 sky.js 切到 --recipe: light 时启用 */
+:root[data-recipe="light"] {
+  --glass-bg: rgba(255, 255, 255, .34);
+  --glass-bg-strong: rgba(255, 255, 255, .5);
+  --glass-border: rgba(255, 255, 255, .45);
+  --glass-shadow: 0 16px 40px rgba(40, 70, 95, .18);
+  --hairline: rgba(255, 255, 255, .4);
+  --text: #0d2b3e;
+  --text-dim: #3d6076;
+  --text-faint: #5a7d92;
+  --accent: #0b6a93;
+  --accent-soft: rgba(11, 106, 147, .12);
+  --danger: #a8503f;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { height: 100%; }
+
+body {
+  min-height: 100%;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  color: var(--text);
+  background: linear-gradient(178deg, var(--sky-top) 0%, var(--sky-bottom) 100%) fixed;
+  transition: background var(--dur-base) var(--ease-out);
+  -webkit-font-smoothing: antialiased;
+}
+
+main { max-width: var(--maxw); margin: 0 auto; padding: 0 18px 40px; }
+
+/* ---- 天空舞台（背景装饰层） ---- */
+.sky { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+
+.orb { position: absolute; border-radius: 50%; filter: blur(50px);
+       background: radial-gradient(circle, var(--sky-glow), transparent 70%);
+       opacity: .8; transition: opacity 1.2s; }
+.orb-a { width: 340px; height: 340px; top: -80px; left: -90px; }
+.orb-b { width: 420px; height: 420px; bottom: -120px; right: -120px; opacity: .5; }
+
+.stars { position: absolute; inset: 0; opacity: var(--stars-o); transition: opacity 2s; }
+.stars i { position: absolute; width: 2px; height: 2px; border-radius: 50%;
+           background: #dcecf8; animation: twinkle 3.2s ease-in-out infinite; }
+@keyframes twinkle { 50% { opacity: .25; } }
+
+/* ---- 玻璃 ---- */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: background var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out);
+}
+
+.card { padding: 20px 18px; }
+
+/* ---- 时钟卡 ---- */
+.hero { padding: 76px 0 34px; }
+
+.clock-card { text-align: center; padding: 34px 18px 28px; }
+
+.eyebrow {
+  font-size: 12px; letter-spacing: .3em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 16px; font-weight: 500;
+}
+
+.clock {
+  font-size: clamp(64px, 20vw, 84px);
+  font-weight: 200;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+  color: var(--text);
+}
+.clock .colon { animation: breathe 2s ease-in-out infinite; }
+.clock .sec {
+  font-size: .32em; color: var(--text-dim);
+  margin-left: .18em; vertical-align: .16em;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes breathe { 50% { opacity: .35; } }
+
+.date-line { margin-top: 14px; font-size: 14px; color: var(--text-dim); letter-spacing: .06em; }
+
+/* ---- 倒数日 ---- */
+.countdown { padding: 8px 0 20px; }
+
+.section-title {
+  font-size: 15px; font-weight: 500; letter-spacing: .18em;
+  color: var(--text-faint); text-align: center; margin: 20px 0 16px;
+}
+
+.form-card { display: grid; gap: 10px; margin-bottom: 14px; }
+
+input[type="text"], input[type="date"] {
+  width: 100%; min-height: 46px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  background: var(--glass-bg-strong);
+  color: var(--text);
+  font: 400 15px/1.4 inherit;
+  font-family: inherit;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+input::placeholder { color: var(--text-faint); }
+input:focus { outline: none; border-color: var(--accent); }
+input[type="date"] { color-scheme: dark; }
+:root[data-recipe="light"] input[type="date"] { color-scheme: light; }
+
+.btn {
+  min-height: 46px;
+  border: none; border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font: 500 15px/1 inherit; font-family: inherit;
+  letter-spacing: .06em;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out);
+}
+.btn:active { transform: scale(.97); background: var(--accent); color: #06121d; }
+@media (hover: hover) {
+  .btn:hover { background: var(--accent); color: #06121d; }
+}
+
+/* 倒数日列表 */
+.cd-list { list-style: none; display: grid; gap: 10px; }
+
+.cd-item { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+
+.cd-info { flex: 1; min-width: 0; }
+.cd-name { font-size: 15.5px; font-weight: 500; overflow: hidden;
+           text-overflow: ellipsis; white-space: nowrap; }
+.cd-sub { font-size: 12.5px; color: var(--text-faint); margin-top: 3px; }
+
+.cd-days { display: flex; align-items: baseline; justify-content: flex-end;
+           gap: 5px; text-align: right; flex-shrink: 0; white-space: nowrap; }
+.cd-days .n { font-size: 26px; font-weight: 300; line-height: 1;
+              font-variant-numeric: tabular-nums; }
+.cd-days .n:only-child { font-size: 17px; font-weight: 500; color: var(--accent); }
+.cd-days .u { font-size: 11px; color: var(--text-dim); letter-spacing: .1em; }
+.cd-item.is-today .n { color: var(--accent); font-weight: 500; }
+.cd-item.is-past { opacity: .55; }
+
+.cd-del {
+  flex-shrink: 0; width: 34px; height: 44px;
+  border: none; background: none; color: var(--text-faint);
+  font-size: 17px; cursor: pointer; border-radius: 8px;
+  transition: color var(--dur-fast), transform var(--dur-fast);
+}
+.cd-del:active { transform: scale(.9); color: var(--danger); }
+@media (hover: hover) { .cd-del:hover { color: var(--danger); } }
+
+.empty { text-align: center; font-size: 13.5px; line-height: 1.8;
+         color: var(--text-faint); padding: 26px 20px; }
+
+.foot { text-align: center; font-size: 11.5px; color: var(--text-dim);
+        letter-spacing: .08em; padding: 26px 0 10px; }
+
+/* ---- 可访问性与降级 ---- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden;
+           clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .stars i { animation: none; opacity: .6; }
+}
