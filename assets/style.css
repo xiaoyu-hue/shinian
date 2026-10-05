@@ -120,6 +120,9 @@ main {
            background: #dcecf8; animation: twinkle 3.2s ease-in-out infinite; }
 @keyframes twinkle { 50% { opacity: .25; } }
 
+/* v0.5.5 季节彩蛋层：位于星空之上、内容之下（挂在 .sky 内，同属 z-index:-1 背景层） */
+.decor-canvas { position: absolute; inset: 0; pointer-events: none; }
+
 /* ---- 玻璃 ---- */
 .glass {
   background: var(--glass-bg);

@@ -18,6 +18,7 @@
     }
   </script>
   <script src="assets/notifications.js" defer></script>
+  <script src="assets/decor.js" defer></script>
   <script src="assets/app.js" defer></script>
 </head>
 <body>
@@ -26,6 +27,7 @@
     <div class="orb orb-a"></div>
     <div class="orb orb-b"></div>
     <div class="stars" id="stars" aria-hidden="true"></div>
+    <canvas class="decor-canvas" id="decorCanvas" aria-hidden="true"></canvas>
   </div>
 
   <!-- 天气装饰层 -->
@@ -79,9 +81,9 @@
                     role="switch" aria-checked="true" aria-label="微交互"></button>
           </label>
           <label class="set-row" for="decorToggle">
-            <span>天气装饰层</span>
+            <span>天空装饰层</span>
             <button type="button" class="set-toggle on" id="decorToggle"
-                    role="switch" aria-checked="true" aria-label="天气装饰层"></button>
+                    role="switch" aria-checked="true" aria-label="天空装饰层"></button>
           </label>
         </div>
 
