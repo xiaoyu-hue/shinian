@@ -88,6 +88,24 @@
     localStorage.setItem(KEY, JSON.stringify(items));
   }
 
+  // ---------- 许愿池（v0.5.9） ----------
+  var WISH_KEY = 'shinian.wishes.v1';
+  var WISH_MAX = 100;
+
+  function loadWishes() {
+    try {
+      var raw = localStorage.getItem(WISH_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function saveWishes(list) {
+    try { localStorage.setItem(WISH_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+  function newWishId() {
+    return 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
   // 日期合法性：格式 + 真实日历（防止 2026-02-30 这类不存在的日期混入）
   function isValidDate(s) {
     if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
@@ -113,6 +131,140 @@
 
   var hasRendered = false;   // 区分「首屏入场」与「后续新增」
   var lastDiffs = {};        // 上次渲染的天数，用于判断数字是否需要翻转
+
+  // 许愿池渲染：未完成在前，已完成沉底
+  function renderWishes() {
+    var list = loadWishes();
+    var ul = document.getElementById('wishList');
+    if (!ul) return;
+
+    var undone = list.filter(function (w) { return !w.done; });
+    var done = list.filter(function (w) { return w.done; });
+    undone.sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
+    done.sort(function (a, b) { return String(b.doneAt || '').localeCompare(String(a.doneAt || '')); });
+    var ordered = undone.concat(done);
+
+    ul.innerHTML = '';
+    ordered.forEach(function (w) {
+      var li = document.createElement('li');
+      li.className = 'wish-item' + (w.done ? ' is-done' : '');
+
+      var chk = document.createElement('button');
+      chk.type = 'button';
+      chk.className = 'wish-check';
+      chk.setAttribute('role', 'checkbox');
+      chk.setAttribute('aria-checked', w.done ? 'true' : 'false');
+      chk.setAttribute('aria-label', (w.done ? '取消完成：' : '标记完成：') + w.text);
+      chk.textContent = w.done ? '\u2713' : '';
+      chk.addEventListener('click', function () {
+        var l = loadWishes();
+        for (var i = 0; i < l.length; i++) {
+          if (l[i].id === w.id) {
+            l[i].done = !l[i].done;
+            l[i].doneAt = l[i].done ? new Date().toISOString() : null;
+            break;
+          }
+        }
+        saveWishes(l); renderWishes(); haptic(10);
+      });
+
+      var txt = document.createElement('span');
+      txt.className = 'wish-text';
+      txt.textContent = w.text;
+
+      var meta = document.createElement('span');
+      meta.className = 'wish-meta';
+      meta.textContent = w.date ? w.date : '';
+
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'wish-del';
+      del.setAttribute('aria-label', '删除心愿：' + w.text);
+      del.textContent = '\u2715';
+      del.addEventListener('click', function () {
+        if (!window.confirm('删除这个心愿？\n「' + w.text + '」')) return;
+        saveWishes(loadWishes().filter(function (x) { return x.id !== w.id; }));
+        renderWishes(); haptic(8);
+      });
+
+      li.appendChild(chk); li.appendChild(txt); li.appendChild(meta); li.appendChild(del);
+      ul.appendChild(li);
+    });
+
+    var empty = document.getElementById('wishEmpty');
+    var clearBtn = document.getElementById('wishClearDone');
+    var total = document.getElementById('wishTotal');
+    var dn = document.getElementById('wishDone');
+    if (empty) empty.hidden = list.length > 0;
+    if (clearBtn) clearBtn.hidden = done.length === 0;
+    if (total) total.textContent = String(list.length);
+    if (dn) dn.textContent = String(done.length);
+  }
+
+  // 许愿池交互：折叠、许下、清空已完成
+  function initWishes() {
+    var form = document.getElementById('wishForm');
+    var input = document.getElementById('wishText');
+    var dateEl = document.getElementById('wishDate');
+    var summary = document.getElementById('wishSummary');
+    var body = document.getElementById('wishBody');
+
+    var collapsed = settings.wishCollapsed !== false;
+    function applyCollapsed() {
+      if (body) body.hidden = collapsed;
+      if (summary) summary.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+    if (summary) {
+      summary.addEventListener('click', function () {
+        collapsed = !collapsed;
+        settings.wishCollapsed = collapsed;
+        saveSettings();
+        applyCollapsed();
+        haptic(6);
+      });
+    }
+    applyCollapsed();
+
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var text = (input.value || '').trim();
+        if (!text) { hint('先写点什么吧'); return; }
+        var list = loadWishes();
+        if (list.length >= WISH_MAX) { hint('心愿已达 ' + WISH_MAX + ' 条上限，先清理已完成的吧'); return; }
+        list.push({
+          id: newWishId(),
+          text: text.slice(0, 40),
+          createdAt: new Date().toISOString(),
+          date: (dateEl && dateEl.value && isValidDate(dateEl.value)) ? dateEl.value : null,
+          done: false, doneAt: null, targetId: null
+        });
+        saveWishes(list);
+        input.value = '';
+        if (dateEl) dateEl.value = '';
+        renderWishes();
+        if (collapsed) {                       // 首次许愿后自动展开一次
+          collapsed = false;
+          settings.wishCollapsed = false;
+          saveSettings();
+          applyCollapsed();
+        }
+        haptic(12);
+      });
+    }
+
+    var clearDone = document.getElementById('wishClearDone');
+    if (clearDone) {
+      clearDone.addEventListener('click', function () {
+        var list = loadWishes();
+        var dn = list.filter(function (w) { return w.done; }).length;
+        if (!dn) return;
+        if (!window.confirm('清空已完成的 ' + dn + ' 个心愿？\n此操作不可恢复。')) return;
+        saveWishes(list.filter(function (w) { return !w.done; }));
+        renderWishes(); haptic(8);
+      });
+    }
+  }
 
   function render() {
     var items = load();
@@ -502,6 +654,7 @@
   var SET_KEY = 'shinian.settings.v1';
   var settings = {
     recipe: 'auto', motion: true, decor: true,
+    wishCollapsed: true,          // v0.5.9 许愿池默认折叠；用户可自定义并记住
     remind: { water: false, waterIntervalH: 2, quietStart: 22, quietEnd: 8,
               cd: false, cdTime: '08:00', cdLeadTime: '20:00' }
   };
@@ -513,6 +666,7 @@
         if (s.recipe === 'auto' || s.recipe === 'light' || s.recipe === 'dark') settings.recipe = s.recipe;
         if (typeof s.motion === 'boolean') settings.motion = s.motion;
         if (typeof s.decor === 'boolean') settings.decor = s.decor;
+        if (typeof s.wishCollapsed === 'boolean') settings.wishCollapsed = s.wishCollapsed;
         if (s.remind && typeof s.remind === 'object') {
           var r = s.remind;
           if (typeof r.water === 'boolean') settings.remind.water = r.water;
@@ -592,9 +746,10 @@
 
   function backupPayload() {
     return JSON.stringify({
-      app: 'shinian', schema: 1,
+      app: 'shinian', schema: 2,
       exportedAt: new Date().toISOString(),
-      items: load()
+      items: load(),
+      wishes: loadWishes()
     });
   }
   function stamp() {
@@ -753,8 +908,33 @@
             cur.push({ id: id, name: String(x.name || '未命名').slice(0, 30), date: x.date });
             added++;
           });
-          save(cur); render(); syncSettingsUI();
-          hint('导入完成：新增 ' + added + ' 条' +
+          // 心愿（v0.5.9）：旧备份无 wishes 字段时跳过，不覆盖现有心愿
+          var wAdded = 0;
+          var wIn = data && data.wishes;
+          if (Array.isArray(wIn) && wIn.length) {
+            var wl = loadWishes(), wh = {};
+            wl.forEach(function (x) { wh[x.id] = 1; });
+            wIn.forEach(function (x) {
+              if (!x || typeof x.text !== 'string' || !x.text) return;
+              var wid = x.id || newWishId();
+              if (wh[wid]) return;
+              wh[wid] = 1;
+              wl.push({
+                id: wid,
+                text: String(x.text).slice(0, 40),
+                done: !!x.done,
+                doneAt: x.doneAt || null,
+                date: (typeof x.date === 'string' && isValidDate(x.date)) ? x.date : null,
+                targetId: x.targetId || null,
+                createdAt: x.createdAt || new Date().toISOString()
+              });
+              wAdded++;
+            });
+            saveWishes(wl);
+          }
+          save(cur); render(); renderWishes(); syncSettingsUI();
+          hint('导入完成：新增 ' + added + ' 条念想' +
+               (wAdded ? '、' + wAdded + ' 个心愿' : '') +
                (dup ? '，跳过 ' + dup + ' 条重复' : '') +
                (bad ? '，丢弃 ' + bad + ' 条日期无效' : ''));
           haptic(12);
@@ -768,11 +948,13 @@
 
     // 清空（二次确认）
     document.getElementById('clearBtn').addEventListener('click', function () {
-      var n = load().length;
-      if (!n) { hint('已经没有念想了'); return; }
-      if (!window.confirm('确定清空全部 ' + n + ' 条念想吗？\n此操作不可恢复，建议先备份。')) return;
-      save([]); render(); syncSettingsUI();
-      hint('已清空全部念想');
+      var n = load().length, wn = loadWishes().length;
+      if (!n && !wn) { hint('已经没有念想了'); return; }
+      var msg = '确定清空全部 ' + n + ' 条念想' + (wn ? ' 和 ' + wn + ' 个心愿' : '') +
+                '吗？\n此操作不可恢复，建议先备份。';
+      if (!window.confirm(msg)) return;
+      save([]); saveWishes([]); render(); renderWishes(); syncSettingsUI();
+      hint('已清空全部念想' + (wn ? '与心愿' : ''));
       haptic(12);
     });
   }
@@ -851,6 +1033,9 @@
     initForm();
     initPerfMonitor();
     render();
+    // 许愿池不依赖城市数据，同步初始化（避免城市加载失败时永远不出现）
+    initWishes();
+    renderWishes();
     // 网络恢复后自动重试天气（PLAN v0.2 · Phase 4 断网降级链路）
     window.addEventListener('online', function () {
       if (currentCity) refreshWeather();

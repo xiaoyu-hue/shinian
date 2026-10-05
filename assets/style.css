@@ -410,6 +410,39 @@ main {
   color: var(--text-faint); text-align: center; margin: 20px 0 16px;
 }
 
+/* ---- v0.5.9 许愿池（备忘录式心愿清单） ---- */
+.wish-card { padding: 12px 16px; }
+.wish-summary { display: flex; align-items: center; justify-content: space-between;
+  width: 100%; min-height: 44px; padding: 0; border: 0; background: none;
+  color: var(--text-dim); font: 14px/1 inherit; font-family: inherit; cursor: pointer; }
+.wish-summary b { color: var(--text); font-weight: 500; }
+.wish-chevron { transition: transform .2s; color: var(--text-faint); }
+.wish-summary[aria-expanded="true"] .wish-chevron { transform: rotate(180deg); }
+.wish-body { margin-top: 10px; }
+.wish-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.wish-form input[type="text"] { flex: 1 1 160px; min-height: 40px; padding: 6px 10px;
+  border: 1px solid var(--hairline); border-radius: 8px; background: rgba(120,140,160,.12);
+  color: var(--text); font: 14px/1 inherit; font-family: inherit; }
+.wish-form input[type="date"] { min-height: 40px; padding: 6px 8px;
+  border: 1px solid var(--hairline); border-radius: 8px; background: rgba(120,140,160,.12);
+  color: var(--text); font: 13px/1 inherit; font-family: inherit; }
+.wish-list { list-style: none; margin: 0; padding: 0; }
+.wish-item { display: flex; align-items: center; gap: 10px; min-height: 44px;
+  padding: 6px 0; border-bottom: 1px solid var(--hairline); }
+.wish-item:last-child { border-bottom: 0; }
+.wish-check { width: 26px; height: 26px; flex-shrink: 0;
+  border: 1px solid var(--hairline); border-radius: 50%;
+  background: rgba(120,140,160,.12); color: var(--text); cursor: pointer;
+  font: 13px/1 inherit; font-family: inherit; }
+.wish-item.is-done .wish-check { background: rgba(255,214,140,.28); }
+.wish-text { flex: 1; font-size: 14px; color: var(--text); }
+.wish-item.is-done .wish-text { color: var(--text-faint); text-decoration: line-through; }
+.wish-meta { font-size: 12px; color: var(--text-faint); }
+.wish-del { width: 32px; height: 32px; flex-shrink: 0; border: 0; background: none;
+  color: var(--text-faint); cursor: pointer; font: 14px/1 inherit; font-family: inherit; }
+.wish-empty { padding: 10px 0; font-size: 13px; color: var(--text-faint); }
+.wish-actions { margin-top: 8px; }
+
 /* ---- v0.5.7 提醒模块（主页面 · 倒数日下方，从设置面板下放） ---- */
 .remind-card { padding: 14px 16px; }
 .remind-hint { margin: 0 0 12px; font-size: 12px; line-height: 1.6;

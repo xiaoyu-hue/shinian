@@ -128,6 +128,40 @@
       <div id="cdEmpty" class="glass card empty" hidden>
         还没有念想。挑一个日子——生日、约定，或者任何你在等的东西。
       </div>
+    <!-- 许愿池（v0.5.9）：备忘录式心愿清单 -->
+    <section class="wishes" aria-label="许愿池">
+      <h2 class="section-title">许愿池</h2>
+
+      <div class="glass card wish-card">
+        <button type="button" class="wish-summary" id="wishSummary"
+                aria-expanded="false" aria-controls="wishBody">
+          <span>已许下 <b id="wishTotal">0</b> 个心愿 · 实现 <b id="wishDone">0</b> 个</span>
+          <span class="wish-chevron" aria-hidden="true">▾</span>
+        </button>
+
+        <div class="wish-body" id="wishBody" hidden>
+          <form id="wishForm" class="wish-form">
+            <label class="sr-only" for="wishText">写下一个心愿</label>
+            <input id="wishText" type="text" maxlength="40"
+                   placeholder="想吃点什么、想去哪里…" autocomplete="off">
+            <label class="sr-only" for="wishDate">打算哪天（可选）</label>
+            <input id="wishDate" type="date">
+            <button type="submit" class="btn" id="wishSubmit">许下</button>
+          </form>
+
+          <ul id="wishList" class="wish-list"></ul>
+
+          <div id="wishEmpty" class="wish-empty" hidden>
+            还没有心愿。想到什么就记一笔——做到了再回来打勾。
+          </div>
+
+          <div class="wish-actions">
+            <button type="button" class="btn-cancel" id="wishClearDone" hidden>清空已完成</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 提醒（喝水 + 倒数日）：从设置面板下放，与内容相邻 -->
     <section class="remind" aria-label="提醒">
       <h2 class="section-title">提醒</h2>
