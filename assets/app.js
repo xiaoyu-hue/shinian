@@ -453,8 +453,14 @@
     }
 
     var code = weatherData.weatherCode;
+    var isDay = weatherData.isDay;   // 0=夜间 1=白天（weather.js 已回传）
     var prevIcon = icon.textContent, prevTemp = temp.textContent;
-    icon.textContent = WEATHER_ICONS[code] || '🌤';
+    var iconChar = WEATHER_ICONS[code] || '🌤';
+    // 夜间把晴/少云的太阳图标换成月亮，避免“半夜显示太阳”
+    if (isDay === 0 && (code === 0 || code === 1 || code === 2)) {
+      iconChar = '🌙';
+    }
+    icon.textContent = iconChar;
     temp.textContent = Math.round(weatherData.temperature) + '°';
     // 只在真正变化时才播放，避免每分钟重绘都闪一下
     if (prevIcon && prevIcon !== icon.textContent) popIn(icon);
