@@ -72,27 +72,57 @@
     });
   }
 
+  // 今天的某个时刻（HH:mm）；用于倒数日提醒
+  function atTimeToday(hhmm) {
+    var parts = (hhmm || '08:00').split(':');
+    var d = new Date();
+    d.setHours(+parts[0] || 0, +parts[1] || 0, 0, 0);
+    return d;
+  }
+
+  // 倒数日提醒：提前一天（diff===1）提醒「明天是 X」+ 当天（diff===0）提醒「今天是 X」
+  // 两点都只排「未来」时刻：已过点的不再补发，避免出现「晚上才说今天是」的迟来提醒
   function scheduleCountdown(items, cfg) {
     var ln = getPlugin();
     if (!ln) return Promise.resolve({ ok: false, reason: 'unavailable' });
-    var today = items.filter(function (it) { return it.diff === 0; });
-    if (!today.length) return Promise.resolve({ ok: true, count: 0 });
+    var lead = items.filter(function (it) { return it.diff === 1; });   // 明天到期
+    var today = items.filter(function (it) { return it.diff === 0; });  // 今天到期
+    if (!lead.length && !today.length) return Promise.resolve({ ok: true, count: 0 });
+
     return ensurePermission().then(function (granted) {
       if (!granted) return { ok: false, reason: 'permission' };
-      var parts = (cfg.cdTime || '20:00').split(':');
-      var at = new Date(); at.setHours(+parts[0], +parts[1] || 0, 0, 0);
-      if (at <= new Date()) at.setDate(at.getDate() + 1);
-      var notifications = today.map(function (it, i) {
-        return {
-          id: 200000 + i,
-          title: '今天是 ' + it.name + ' 🌟',
-          body: '念想成真的一天，记得好好庆祝。',
-          schedule: { at: at, allowWhileIdle: true },
-          extra: { kind: 'countdown', itemId: it.id }
-        };
-      });
-      return ln.schedule({ notifications: notifications }).then(function () {
-        return { ok: true, count: notifications.length };
+      var now = new Date();
+      var nots = [];
+
+      var atLead = atTimeToday(cfg.cdLeadTime);
+      if (lead.length && atLead > now) {
+        lead.forEach(function (it, i) {
+          nots.push({
+            id: 210000 + i,
+            title: '明天是 ' + it.name + ' 🌟',
+            body: '提前一天提醒：明天就是「' + it.name + '」了，可以准备起来了。',
+            schedule: { at: atLead, allowWhileIdle: true },
+            extra: { kind: 'countdown', itemId: it.id, lead: 1 }
+          });
+        });
+      }
+
+      var atToday = atTimeToday(cfg.cdTime);
+      if (today.length && atToday > now) {
+        today.forEach(function (it, i) {
+          nots.push({
+            id: 200000 + i,
+            title: '今天是 ' + it.name + ' 🌟',
+            body: '念想成真的一天，记得好好庆祝。',
+            schedule: { at: atToday, allowWhileIdle: true },
+            extra: { kind: 'countdown', itemId: it.id, lead: 0 }
+          });
+        });
+      }
+
+      if (!nots.length) return { ok: true, count: 0 };
+      return ln.schedule({ notifications: nots }).then(function () {
+        return { ok: true, count: nots.length };
       }).catch(function (e) { return { ok: false, reason: 'schedule', error: String(e) }; });
     });
   }

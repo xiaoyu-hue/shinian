@@ -502,7 +502,8 @@
   var SET_KEY = 'shinian.settings.v1';
   var settings = {
     recipe: 'auto', motion: true, decor: true,
-    remind: { water: false, waterIntervalH: 2, quietStart: 22, quietEnd: 8, cd: false, cdTime: '20:00' }
+    remind: { water: false, waterIntervalH: 2, quietStart: 22, quietEnd: 8,
+              cd: false, cdTime: '08:00', cdLeadTime: '20:00' }
   };
 
   function loadSettings() {
@@ -520,6 +521,7 @@
           if (isFinite(r.quietEnd)) settings.remind.quietEnd = Math.min(23, Math.max(0, +r.quietEnd));
           if (typeof r.cd === 'boolean') settings.remind.cd = r.cd;
           if (typeof r.cdTime === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(r.cdTime)) settings.remind.cdTime = r.cdTime;
+          if (typeof r.cdLeadTime === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(r.cdLeadTime)) settings.remind.cdLeadTime = r.cdLeadTime;
         }
       }
     } catch (e) {}
@@ -543,8 +545,9 @@
   // 本地提醒：按当前设置重排（网页端无 Capacitor 插件时静默跳过；开启时由开关处提示）
   function applyReminders() {
     if (!window.ShiNianRemind) return;
-    var items = load().filter(function (it) { return dayDiff(it.date) === 0; })
-      .map(function (it) { return { id: it.id, name: it.name, date: it.date, diff: 0 }; });
+    var items = load().map(function (it) {
+      return { id: it.id, name: it.name, date: it.date, diff: dayDiff(it.date) };
+    }).filter(function (it) { return it.diff === 0 || it.diff === 1; });
     window.ShiNianRemind.apply(settings.remind, items);
   }
 
@@ -572,6 +575,12 @@
     if (crt) { crt.classList.toggle('on', settings.remind.cd); crt.setAttribute('aria-checked', String(settings.remind.cd)); }
     var ct = document.getElementById('cdRemindTime');
     if (ct) ct.value = settings.remind.cdTime;
+    var clt = document.getElementById('cdLeadTime');
+    if (clt) clt.value = settings.remind.cdLeadTime;
+
+    // 网页端（无原生桥）显示提示；App 内可用则隐藏
+    var rh = document.getElementById('remindHint');
+    if (rh) rh.hidden = !!(window.ShiNianRemind && window.ShiNianRemind.isAvailable());
   }
   function hint(msg) {
     var el = document.getElementById('setHint');
@@ -689,6 +698,7 @@
     bindRemindInput('remindQuietStart', 'quietStart', function (v) { var n = parseInt(v, 10); return (isNaN(n) || n < 0 || n > 23) ? null : n; });
     bindRemindInput('remindQuietEnd', 'quietEnd', function (v) { var n = parseInt(v, 10); return (isNaN(n) || n < 0 || n > 23) ? null : n; });
     bindRemindInput('cdRemindTime', 'cdTime', function (v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v) ? v : null; });
+    bindRemindInput('cdLeadTime', 'cdLeadTime', function (v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v) ? v : null; });
 
     // 导出 · 复制文本
     document.getElementById('exportCopy').addEventListener('click', function () {

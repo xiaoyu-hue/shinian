@@ -410,6 +410,15 @@ main {
   color: var(--text-faint); text-align: center; margin: 20px 0 16px;
 }
 
+/* ---- v0.5.7 提醒模块（主页面 · 倒数日下方，从设置面板下放） ---- */
+.remind-card { padding: 14px 16px; }
+.remind-hint { margin: 0 0 12px; font-size: 12px; line-height: 1.6;
+               color: var(--text-faint); }
+.remind-block + .remind-block { margin-top: 14px; padding-top: 12px;
+                                border-top: 1px solid var(--hairline); }
+.remind-fields { margin-top: 4px; }
+.remind-fields .set-row { min-height: 40px; font-size: 13px; }
+
 .form-card { display: grid; gap: 10px; margin-bottom: 14px; }
 
 input[type="text"], input[type="date"] {
