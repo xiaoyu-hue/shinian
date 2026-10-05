@@ -428,7 +428,7 @@
   var WEATHER_ICONS = {
     0: '☀️', 1: '🌤', 2: '⛅', 3: '☁️', 45: '🌫', 48: '🌫',
     51: '🌦', 53: '🌦', 55: '🌦', 61: '🌧', 63: '🌧', 65: '🌧',
-    71: '🌨', 73: '🌨', 75: '🌨', 80: '🌦', 81: '🌧', 82: '🌧',
+    71: '🌨', 73: '🌨', 75: '🌨', 80: '🌦', 81: '🌧', 82: '🌧', 85: '🌨', 86: '🌨',
     95: '⛈', 96: '⛈', 99: '⛈'
   };
 
@@ -475,8 +475,9 @@
     else if (code >= 51 && code <= 55) weatherType = 'drizzle';
     else if (code >= 61 && code <= 65) weatherType = 'rain';
     else if (code >= 71 && code <= 75) weatherType = 'snow';
+    else if (code >= 80 && code <= 82) weatherType = 'rain';
+    else if (code >= 85 && code <= 86) weatherType = 'snow';
     else if (code >= 95) weatherType = 'thunderstorm';
-    else if (code >= 80) weatherType = 'rain';
 
     root.setAttribute('data-weather', weatherType);
     line.hidden = false;
