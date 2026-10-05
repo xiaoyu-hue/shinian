@@ -253,6 +253,13 @@ main {
 .set-btn.danger { color: var(--danger); }
 .set-hint { margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--text-faint); }
 
+/* 设置面板内的输入控件（提醒间隔/时刻） */
+.set-input { width: 64px; min-height: 32px; padding: 4px 8px; text-align: center;
+  border: 1px solid var(--hairline); border-radius: 8px; background: rgba(120,140,160,.12);
+  color: var(--text); font: 14px/1 inherit; font-family: inherit; }
+.set-input.narrow { width: 44px; }
+.set-input-group { display: inline-flex; align-items: center; gap: 6px; color: var(--text-faint); }
+
 /* 设置驱动：关闭天气装饰层 */
 :root[data-no-decor] .weather-layer,
 :root[data-no-decor] .rain-canvas,

@@ -206,6 +206,7 @@
 
     hasRendered = true;
     syncSettingsUI();       // 让设置面板里的条目数保持同步
+    applyReminders();       // 倒数日变化时重排「今天」提醒
   }
 
   // 删除：高度收拢 + 淡出，结束后其余条目由 render 的 FLIP 平滑上移
@@ -499,7 +500,10 @@
   // 设置持久化在 localStorage['shinian.settings.v1']
   // ============================================================
   var SET_KEY = 'shinian.settings.v1';
-  var settings = { recipe: 'auto', motion: true, decor: true };
+  var settings = {
+    recipe: 'auto', motion: true, decor: true,
+    remind: { water: false, waterIntervalH: 2, quietStart: 22, quietEnd: 8, cd: false, cdTime: '20:00' }
+  };
 
   function loadSettings() {
     try {
@@ -508,6 +512,15 @@
         if (s.recipe === 'auto' || s.recipe === 'light' || s.recipe === 'dark') settings.recipe = s.recipe;
         if (typeof s.motion === 'boolean') settings.motion = s.motion;
         if (typeof s.decor === 'boolean') settings.decor = s.decor;
+        if (s.remind && typeof s.remind === 'object') {
+          var r = s.remind;
+          if (typeof r.water === 'boolean') settings.remind.water = r.water;
+          if (isFinite(r.waterIntervalH)) settings.remind.waterIntervalH = Math.min(12, Math.max(0.5, +r.waterIntervalH));
+          if (isFinite(r.quietStart)) settings.remind.quietStart = Math.min(23, Math.max(0, +r.quietStart));
+          if (isFinite(r.quietEnd)) settings.remind.quietEnd = Math.min(23, Math.max(0, +r.quietEnd));
+          if (typeof r.cd === 'boolean') settings.remind.cd = r.cd;
+          if (typeof r.cdTime === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(r.cdTime)) settings.remind.cdTime = r.cdTime;
+        }
       }
     } catch (e) {}
     applySettings();
@@ -525,7 +538,16 @@
     else root.setAttribute('data-no-decor', '');
     window.dispatchEvent(new CustomEvent('recipeChange'));   // 天空引擎立即重算
     syncSettingsUI();
+    applyReminders();
   }
+  // 本地提醒：按当前设置重排（网页端无 Capacitor 插件时静默跳过；开启时由开关处提示）
+  function applyReminders() {
+    if (!window.ShiNianRemind) return;
+    var items = load().filter(function (it) { return dayDiff(it.date) === 0; })
+      .map(function (it) { return { id: it.id, name: it.name, date: it.date, diff: 0 }; });
+    window.ShiNianRemind.apply(settings.remind, items);
+  }
+
   function syncSettingsUI() {
     var seg = document.getElementById('recipeSeg');
     if (seg) Array.prototype.forEach.call(seg.querySelectorAll('button[data-v]'), function (b) {
@@ -537,6 +559,19 @@
     if (dt) { dt.classList.toggle('on', settings.decor); dt.setAttribute('aria-checked', String(settings.decor)); }
     var c = document.getElementById('itemCount');
     if (c) c.textContent = load().length;
+
+    var rt = document.getElementById('remindToggle');
+    if (rt) { rt.classList.toggle('on', settings.remind.water); rt.setAttribute('aria-checked', String(settings.remind.water)); }
+    var ci = document.getElementById('remindInterval');
+    if (ci) ci.value = settings.remind.waterIntervalH;
+    var qs = document.getElementById('remindQuietStart');
+    if (qs) qs.value = settings.remind.quietStart;
+    var qe = document.getElementById('remindQuietEnd');
+    if (qe) qe.value = settings.remind.quietEnd;
+    var crt = document.getElementById('cdRemindToggle');
+    if (crt) { crt.classList.toggle('on', settings.remind.cd); crt.setAttribute('aria-checked', String(settings.remind.cd)); }
+    var ct = document.getElementById('cdRemindTime');
+    if (ct) ct.value = settings.remind.cdTime;
   }
   function hint(msg) {
     var el = document.getElementById('setHint');
@@ -624,6 +659,36 @@
     }
     bindToggle('motionToggle', 'motion');
     bindToggle('decorToggle', 'decor');
+
+    // 本地提醒
+    function bindRemindToggle(id, key) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('click', function () {
+        settings.remind[key] = !settings.remind[key];
+        saveSettings(); applySettings(); haptic(8);
+        if (settings.remind[key] && window.ShiNianRemind && !window.ShiNianRemind.isAvailable()) {
+          hint('本地提醒需安装 App（安卓 APK）才会弹出系统通知；网页版已保存设置但不弹通知。');
+        }
+      });
+    }
+    bindRemindToggle('remindToggle', 'water');
+    bindRemindToggle('cdRemindToggle', 'cd');
+
+    function bindRemindInput(id, key, parse) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('change', function () {
+        var v = parse(el.value);
+        if (v === null || v === undefined) { el.value = settings.remind[key]; return; }
+        settings.remind[key] = v;
+        saveSettings(); applySettings(); haptic(6);
+      });
+    }
+    bindRemindInput('remindInterval', 'waterIntervalH', function (v) { var n = parseFloat(v); return (isFinite(n) && n >= 0.5 && n <= 12) ? n : null; });
+    bindRemindInput('remindQuietStart', 'quietStart', function (v) { var n = parseInt(v, 10); return (isNaN(n) || n < 0 || n > 23) ? null : n; });
+    bindRemindInput('remindQuietEnd', 'quietEnd', function (v) { var n = parseInt(v, 10); return (isNaN(n) || n < 0 || n > 23) ? null : n; });
+    bindRemindInput('cdRemindTime', 'cdTime', function (v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v) ? v : null; });
 
     // 导出 · 复制文本
     document.getElementById('exportCopy').addEventListener('click', function () {

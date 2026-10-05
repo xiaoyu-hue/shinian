@@ -1,9 +1,14 @@
 {
-  "appId": "io.xiaoyuhue.shinian",
+  "appId": "io.xiaoyu-hue.shinian",
   "appName": "时念",
   "webDir": "www",
   "bundledWebRuntime": false,
   "android": {
     "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_shinian"
+    }
   }
 }

@@ -9,7 +9,14 @@
 <script src="assets/cities.js" defer></script>
 <script src="assets/sky.js" defer></script>
 <script src="assets/weather.js" defer></script>
-<script src="assets/app.js" defer></script>
+  <!-- 本地提醒插件：仅在原生 APK（存在 window.Capacitor 桥）中加载；纯网页跳过以免报错 -->
+  <script>
+    if (window.Capacitor) {
+      document.write('<script src="assets/plugins/local-notifications.js"><\/script>');
+    }
+  </script>
+  <script src="assets/notifications.js" defer></script>
+  <script src="assets/app.js" defer></script>
 </head>
 <body>
   <!-- 天空舞台：背景由天空引擎驱动 -->
@@ -73,6 +80,35 @@
             <span>天气装饰层</span>
             <button type="button" class="set-toggle on" id="decorToggle"
                     role="switch" aria-checked="true" aria-label="天气装饰层"></button>
+          </label>
+        </div>
+
+        <div class="set-block">
+          <div class="set-label">本地提醒 · 需安装 App</div>
+          <label class="set-row" for="remindToggle">
+            <span>启用喝水提醒</span>
+            <button type="button" class="set-toggle" id="remindToggle"
+                    role="switch" aria-checked="false" aria-label="启用喝水提醒"></button>
+          </label>
+          <label class="set-row">
+            <span>喝水间隔（小时）</span>
+            <input type="number" id="remindInterval" class="set-input" min="0.5" max="12" step="0.5" value="2">
+          </label>
+          <label class="set-row">
+            <span>安静时段（停止—开始）</span>
+            <span class="set-input-group">
+              <input type="number" id="remindQuietEnd" class="set-input narrow" min="0" max="23" value="8">–
+              <input type="number" id="remindQuietStart" class="set-input narrow" min="0" max="23" value="22">
+            </span>
+          </label>
+          <label class="set-row" for="cdRemindToggle">
+            <span>倒数日「今天」提醒</span>
+            <button type="button" class="set-toggle" id="cdRemindToggle"
+                    role="switch" aria-checked="false" aria-label="倒数日今天提醒"></button>
+          </label>
+          <label class="set-row">
+            <span>提醒时刻</span>
+            <input type="time" id="cdRemindTime" class="set-input" value="20:00">
           </label>
         </div>
 
