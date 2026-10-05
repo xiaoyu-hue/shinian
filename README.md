@@ -76,6 +76,19 @@
 
 **运行时零框架依赖**——不引入任何前端框架、不引入构建工具。v0.1 时期零网络请求；v0.2 起仅新增一个 Open-Meteo 天气请求（免密钥、不含任何个人信息），且失败时静默降级，不影响时钟与倒数日。
 
+### 参考借鉴（v0.5.5 季节彩蛋）
+
+四季彩蛋为**自研实现**，以下项目**并未被引入**（本仓库保持运行时零依赖），但它们的思路给了直接启发，一并致谢：
+
+| 项目 | 借鉴点 |
+|---|---|
+| [natural-falling-effect](https://github.com/qtqz/natural-falling-effect) | 落花 / 落叶 / 下雨 / 下雪整合进同一套 canvas 粒子架构，并支持淡入淡出与定时关闭 |
+| [minz71/sakura-rain](https://github.com/minz71/sakura-rain) | **delta time 驱动**（120Hz 高刷屏速度一致）、**HiDPI 适配**、尊重 `prefers-reduced-motion` |
+| [chaerry-js](https://github.com/jhin102/chaerry-js) | 轻量零依赖的花瓣效果参数化组织（主题 / 风场 / 密度） |
+| [auroraborealisj](https://github.com/auroraborealisj/auroraborealisj.github.io) | 单文件 canvas 极光，流动渐变波，无构建无依赖 |
+
+> **为什么自研而不直接引入**：本项目为**零构建**结构（无打包器，`index.html` 双击即用）；且这些库不会适配本仓库已有的降级钩子（`data-no-motion` / `data-low-perf` / `data-no-decor`）与「雨雪天气抑制飘落彩蛋」的天气层共存规则。
+
 ### 深深致敬
 
 - **[Open-Meteo](https://open-meteo.com) 团队**：让「没有服务器的个人开发者」也能做天气产品，本项目的零后端路线因你们而成立
