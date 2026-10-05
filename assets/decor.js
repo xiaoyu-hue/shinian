@@ -20,7 +20,8 @@
     fadeIn: 1500,      // 淡入
     fadeOut: 2500,     // 淡出
     cooldown: 120000,  // 同会话冷却
-    retry: 300000      // 未触发时的重试间隔
+    retry: 300000,     // 未触发时的重试间隔
+    ambientCheck: 60000 // 常驻效果：时段与守卫检查间隔（天亮即停）
   };
 
   var WET = { rain: 1, drizzle: 1, snow: 1, thunderstorm: 1 };
@@ -243,10 +244,69 @@
     }
   };
 
+  /* ---------- 常驻 · 流星（任何季节的夜间，间歇划过） ---------- */
+  var meteor = {
+    name: 'meteor',
+    mode: 'persistent',    // 常驻：不按季节触发，夜间持续调度
+    when: 'night',
+    falling: false,
+    gapMin: 40000,         // 间隔 40–90s（用户确认）
+    gapMax: 90000,
+    life: 1.2,             // 单颗寿命（秒）
+    spawn: function () {
+      var dir = Math.random() < 0.5 ? 1 : -1;
+      var ang = 0.30 + Math.random() * 0.35;                 // 与水平夹角
+      var speed = (0.55 + Math.random() * 0.45) * Math.min(W, H);
+      return {
+        x: W * (0.15 + Math.random() * 0.85),
+        y: H * (0.02 + Math.random() * 0.30),
+        vx: Math.cos(ang) * speed * dir,
+        vy: Math.sin(ang) * speed,
+        tail: 0.10 + Math.random() * 0.10,
+        age: 0,
+        life: this.life * (0.8 + Math.random() * 0.5),
+        width: 1.2 + Math.random() * 1.1
+      };
+    },
+    // 单颗更新与绘制；返回 false 表示已结束
+    step: function (m, dt, c) {
+      m.age += dt;
+      if (m.age >= m.life) return false;
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      var k = m.age / m.life;
+      var a = k < 0.15 ? k / 0.15 : (1 - (k - 0.15) / 0.85);  // 快淡入、慢淡出
+      if (a <= 0) return true;
+      var tx = m.x - m.vx * m.tail, ty = m.y - m.vy * m.tail;
+      var g = c.createLinearGradient(m.x, m.y, tx, ty);
+      if (g) {
+        g.addColorStop(0, 'rgba(255,255,255,' + (a * 0.95) + ')');
+        g.addColorStop(0.35, 'rgba(255,255,255,' + (a * 0.35) + ')');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        c.strokeStyle = g;
+        c.lineWidth = m.width;
+        c.lineCap = 'round';
+        c.beginPath();
+        c.moveTo(m.x, m.y);
+        c.lineTo(tx, ty);
+        c.stroke();
+      }
+      c.globalAlpha = a;                                      // 头部亮点
+      c.fillStyle = '#ffffff';
+      c.beginPath();
+      c.arc(m.x, m.y, m.width * 1.1, 0, 6.2832);
+      c.fill();
+      c.globalAlpha = 1;
+      return true;
+    }
+  };
+
   // 季节 → 效果器
   var EFFECTS = { spring: sakura, summer: firefly, autumn: leaf, winter: aurora };
   // 名字 → 效果器（供 ?decor= 调试）
-  var BY_NAME = { sakura: sakura, firefly: firefly, leaf: leaf, aurora: aurora };
+  var BY_NAME = { sakura: sakura, firefly: firefly, leaf: leaf, aurora: aurora, meteor: meteor };
+  // 常驻环境效果：不按季节，满足条件即长期运行
+  var AMBIENT = [meteor];
 
   var canvas = null, ctx = null, dpr = 1, W = 0, H = 0;
   var raf = null, running = false;
@@ -391,6 +451,7 @@
     if (forced) {
       // 强制调试：跳过概率，但仍遵守降级守卫
       if (opts.noMotion || opts.lowPerf || opts.noDecor || opts.disabled) return;
+      if (forced === 'meteor') { ambientOnce(); return; }
       start(BY_NAME[forced] || EFFECTS[forced]);
       return;
     }
@@ -402,12 +463,92 @@
     start(EFFECTS[s]);
   }
 
+  /* ---------- 常驻效果调度（setTimeout 排期 + 按需唤醒 rAF） ---------- */
+  var ambient = null;   // { eff, list, raf, timer, lastT }
+
+  function ambientAllowed() {
+    var r = root();
+    if (r.hasAttribute('data-no-motion')) return false;
+    if (r.hasAttribute('data-low-perf')) return false;
+    if (r.hasAttribute('data-no-decor')) return false;
+    if (!enabled) return false;
+    return !isDay(hours());          // 仅夜间
+  }
+
+  function stopAmbient() {
+    if (!ambient) return;
+    if (ambient.raf) w.cancelAnimationFrame(ambient.raf);
+    if (ambient.timer) clearTimeout(ambient.timer);
+    ambient = null;
+    if (ctx && !running) ctx.clearRect(0, 0, W, H);
+  }
+
+  // 调试 ?decor=meteor 时缩短间隔，便于验收
+  function gapFor(e) {
+    var f = debug();
+    return (f === 'meteor') ? [1500, 4000] : [e.gapMin, e.gapMax];
+  }
+
+  function scheduleNext() {
+    if (!ambient) return;
+    var g = gapFor(ambient.eff);
+    ambient.timer = setTimeout(function () {
+      if (!ambient || !ambientAllowed()) return;
+      ambient.list = [ambient.eff.spawn()];
+      ambient.raf = w.requestAnimationFrame(ambientLoop);
+    }, rand(g[0], g[1]));
+  }
+
+  function ambientLoop(now) {
+    if (!ambient) return;
+    if (!ctx) { stopAmbient(); return; }
+    var dt = ambient.lastT ? Math.min((now - ambient.lastT) / 1000, 0.05) : 0.016;
+    ambient.lastT = now;
+
+    ctx.clearRect(0, 0, W, H);
+    var alive = [], i;
+    for (i = 0; i < ambient.list.length; i++) {
+      if (ambient.eff.step(ambient.list[i], dt, ctx)) alive.push(ambient.list[i]);
+    }
+    ambient.list = alive;
+
+    if (!alive.length) {
+      // 本轮结束：停掉 rAF，回到 setTimeout 等待（空闲期零绘制、零耗电）
+      ambient.raf = null;
+      ambient.lastT = 0;
+      ctx.clearRect(0, 0, W, H);
+      scheduleNext();
+      return;
+    }
+    ambient.raf = w.requestAnimationFrame(ambientLoop);
+  }
+
+  function tickAmbient() {
+    if (!ambientAllowed()) { stopAmbient(); return; }
+    if (!ambient) {
+      if (!setup()) return;
+      ambient = { eff: AMBIENT[0], list: [], raf: null, timer: null, lastT: 0 };
+      scheduleNext();
+    }
+  }
+
+  // 调试：立即来一颗
+  function ambientOnce() {
+    if (!setup()) return;
+    stopAmbient();
+    ambient = { eff: meteor, list: [meteor.spawn()], raf: null, timer: null, lastT: 0 };
+    ambient.raf = w.requestAnimationFrame(ambientLoop);
+  }
+
   function boot() {
     setup();
     maybeTrigger();
     setInterval(maybeTrigger, CONF.retry);   // 未命中概率时定期重试
+    tickAmbient();                                  // 常驻：夜间启动流星
+    setInterval(tickAmbient, CONF.ambientCheck);    // 每分钟复查时段与守卫，天亮即停
     doc.addEventListener('visibilitychange', function () {
-      if (doc.hidden && running) stop();     // 页面不可见立即停止，不空耗 GPU
+      if (doc.hidden) { if (running) stop(); stopAmbient(); }   // 不可见立即停止
+      else { maybeTrigger(); tickAmbient(); }                   // 回到前台再试
     });
   }
 
@@ -421,8 +562,19 @@
     maybeTrigger: maybeTrigger,
     start: start,
     stop: stop,
-    setEnabled: function (v) { enabled = !!v; if (!v && running) stop(); },
+    setEnabled: function (v) {
+      enabled = !!v;
+      if (!v) { if (running) stop(); stopAmbient(); }
+    },
     EFFECTS: EFFECTS,
-    _test: { guardsPass: guardsPass, timeOK: timeOK, weatherOK: weatherOK, isDay: isDay, CONF: CONF }
+    AMBIENT: AMBIENT,
+    METEOR: meteor,
+    tickAmbient: tickAmbient,
+    stopAmbient: stopAmbient,
+    ambientOnce: ambientOnce,
+    _test: {
+      guardsPass: guardsPass, timeOK: timeOK, weatherOK: weatherOK, isDay: isDay,
+      CONF: CONF, meteor: meteor, ambientAllowed: ambientAllowed, gapFor: gapFor
+    }
   };
 })();
