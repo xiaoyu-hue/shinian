@@ -88,6 +88,14 @@
     localStorage.setItem(KEY, JSON.stringify(items));
   }
 
+  // 日期合法性：格式 + 真实日历（防止 2026-02-30 这类不存在的日期混入）
+  function isValidDate(s) {
+    if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    var p = s.split('-');
+    var d = new Date(+p[0], +p[1] - 1, +p[2]);
+    return d.getFullYear() === +p[0] && d.getMonth() === +p[1] - 1 && d.getDate() === +p[2];
+  }
+
   // 日差：按本地零点计算（纪念日惯例：当天 = 0）
   function dayDiff(dateStr) {
     var parts = dateStr.split('-');
@@ -312,6 +320,13 @@
   var allCities = [];
 
   function loadCities() {
+    // 优先用内联数据（assets/cities.js）：file:// 双击打开时
+    // 浏览器禁止 fetch 本地 JSON，内联是唯一全功能方案（v0.3.1）
+    if (window.SHINIAN_CITIES && window.SHINIAN_CITIES.length) {
+      allCities = window.SHINIAN_CITIES;
+      return Promise.resolve();
+    }
+    // 兜底：内联缺失时（如旧缓存页面）仍尝试远程读取
     return fetch('data/cities.json')
       .then(function(r){ return r.json(); })
       .then(function(cities){ allCities = cities; })
@@ -647,9 +662,9 @@
           if (!Array.isArray(incoming)) { hint('文件格式不对，无法识别'); return; }
           var cur = load(), have = {};
           cur.forEach(function (x) { have[x.id] = 1; });
-          var added = 0, dup = 0;
+          var added = 0, dup = 0, bad = 0;
           incoming.forEach(function (x) {
-            if (!x || !x.date) return;
+            if (!x || !isValidDate(x.date)) { bad++; return; }   // 日期缺失/格式错/日历上不存在 → 跳过
             var id = x.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
             if (have[id]) { dup++; return; }
             have[id] = 1;
@@ -657,7 +672,9 @@
             added++;
           });
           save(cur); render(); syncSettingsUI();
-          hint('导入完成：新增 ' + added + ' 条' + (dup ? '，跳过 ' + dup + ' 条重复' : ''));
+          hint('导入完成：新增 ' + added + ' 条' +
+               (dup ? '，跳过 ' + dup + ' 条重复' : '') +
+               (bad ? '，丢弃 ' + bad + ' 条日期无效' : ''));
           haptic(12);
         } catch (e) {
           hint('导入失败：不是有效的备份 JSON');
@@ -717,6 +734,7 @@
     var lastSample = performance.now();
 
     function sample() {
+      if (done) return;   // 降级已生效，停止采样省电（v0.3.1）
       frames++;
       var now = performance.now();
       var elapsed = now - lastSample;
@@ -729,6 +747,8 @@
           lowCount++;
           if (lowCount >= TRIGGER_COUNT) {
             document.documentElement.setAttribute('data-low-perf', '');
+            done = true;   // 连续 3 个采样窗口都低于阈值才降级，误判风险足够低
+            return;
           }
         } else {
           lowCount = Math.max(0, lowCount - 1);
@@ -737,6 +757,7 @@
       requestAnimationFrame(sample);
     }
 
+    var done = false;
     requestAnimationFrame(sample);
   }
 

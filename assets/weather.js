@@ -56,14 +56,16 @@ var ShiNianWeather = (function () {
           return r.json();
         })
         .then(function (json) {
-          if (!json || !json.daily) { resolve(null); return; }
+          if (!json || !json.daily || !json.current) { resolve(null); return; }
           var data = {
             city: city.name,
             lat: city.lat,
             lon: city.lon,
             sunrise:    json.daily.sunrise[0],      // "2026-10-05T06:15"
             sunset:     json.daily.sunset[0],        // "2026-10-05T18:12"
-            weatherCode: json.daily.weather_code[0], // WMO 代码 0~99
+            // 天气代码取「当前实况」而非「今天全天」：清晨下雨时，
+            // 全天均值可能还是晴天代码，装饰层会与窗外的雨不符（v0.3.1 修复）
+            weatherCode: json.current.weather_code,  // WMO 代码 0~99
             temperature: json.current.temperature_2m,
             isDay:       json.current.is_day,         // 0 或 1
             fetchedAt:   Date.now()

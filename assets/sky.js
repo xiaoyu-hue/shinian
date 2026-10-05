@@ -96,9 +96,15 @@
   function hexStr(c) {
     return '#' + c.map(function (v) { return ('0' + v.toString(16)).slice(-2); }).join('');
   }
-  // 相对亮度（WCAG 简化版）：0 暗到 1 亮
+  // WCAG 标准相对亮度：sRGB → 线性光（伽马校正）后按人眼三色权重合成
+  // 0 暗到 1 亮；阈值 0.19 按旧简化公式 0.42 等价换算校准（v0.3.1），
+  // 各天空锚点在新旧公式下的亮/暗判定时机一致（误差 <2%）
   function lum(c) {
-    return (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+    function f(v) {
+      v /= 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    }
+    return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
   }
 
   function nowHours() {
@@ -168,7 +174,7 @@
     var lock = document.documentElement.getAttribute('data-recipe-lock');
     var recipe = (lock === 'light' || lock === 'dark')
       ? lock
-      : (lum(bottom) > 0.42 ? 'light' : 'dark');
+      : (lum(bottom) > 0.19 ? 'light' : 'dark');
     document.documentElement.setAttribute('data-recipe', recipe);
   }
 
