@@ -144,6 +144,13 @@
     // 眉题：取权重更大的锚点名
     var name = t < 0.5 ? a.name : b.name;
 
+    // v0.5 季节层：对插值色做低强度季节染色（可选模块；缺失或 ?season=off 时原样返回）
+    if (window.ShiNianSeason) {
+      var sf = window.ShiNianSeason.filter(top, bottom, glow, new Date());
+      top = sf.top; bottom = sf.bottom; glow = sf.glow;
+      document.documentElement.setAttribute('data-season', sf.season);
+    }
+
     var root = document.documentElement.style;
     root.setProperty('--sky-top', rgbStr(top));
     root.setProperty('--sky-bottom', rgbStr(bottom));
