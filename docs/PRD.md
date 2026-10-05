@@ -4,7 +4,7 @@
 
 | 元信息 | 内容 |
 |---|---|
-| 文档版本 | v0.3.0（与当前交付对齐） |
+| 文档版本 | v0.4.0（与当前交付对齐） |
 | 状态 | ✅ v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4 已交付 |
 | 作者 | xiaoyu-hue |
 | 创建日期 | 2026-10-04 |
@@ -120,7 +120,7 @@
 | v0.2 | 天气维度：Open-Meteo 接入（当前天气 + 日出日落驱动黄金时刻）；手动选城市；断网回退纯时间模式 | Open-Meteo | ✅ 已完成 |
 | v0.2.1 | 体验增强：全机型适配（安全区 / 断点 / 触控 / 状态栏）+ 10 项微交互 + 缺陷修复 | 无 | ✅ 已完成 |
 | v0.3 | 设置与数据：玻璃配方锁定、微交互 / 装饰开关、备份恢复（复制 / 下载 / 导入 / 清空） | 无 | ✅ 已完成 |
-| v0.4 | 提醒能力：喝水间隔提醒、倒数日当日提醒（本地通知） | @capacitor/local-notifications | 未开始 |
+| v0.4 | 提醒能力：喝水间隔提醒、倒数日当日提醒（本地通知） | @capacitor/local-notifications | ✅ 已完成 |
 | v0.5 | 季节层 + 节气：四季滤镜；节气切换（以节气为准，非公历季度） | lunar-javascript | 未开始 |
 | v0.6 | 真机化：Capacitor 封装、图标与启动画面、CI 打包 APK、Releases 分发、手机安装实测 | Capacitor + GitHub Actions | 进行中（APK 构建链路已搭建，见 `.github/workflows/build-apk.yml`） |
 
@@ -171,3 +171,4 @@
 | 2026-10-05 | v0.2.1 交付 | 全机型适配（安全区 / 三档断点 / 触控 44px / 状态栏跟随天空 / 桌面与平板双列）；10 项微交互（FLIP 列表、数字翻转、滑动删除、触觉反馈、光晕轨迹、星空视差）；3 项缺陷修复。发布 [v0.2.1](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.2.1)；新增主站 [shinian520.pages.dev](https://shinian520.pages.dev/)，GitHub Pages 转为备用副站 |
 | 2026-10-05 | v0.3 交付 | 新增设置与数据模块：玻璃配方手动锁定、微交互 / 天气装饰开关、念想备份（复制文本 / 下载 JSON）、导入恢复（合并去重）、二次确认清空。发布 [v0.3.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.3.0)；路线图自本版起重排（原 v0.3 提醒能力顺延至 v0.4） |
 | 2026-10-05 | 文档 | 新增 [CHANGELOG.md](../CHANGELOG.md)，确立版本命名规则、判定原则与发布流程 |
+| 2026-10-05 | v0.4 交付 | 本地提醒能力：喝水间隔提醒（活跃窗口计算式排程 + 安静时段跳过）、倒数日「今天」提醒；接入 `@capacitor/local-notifications` v7，网页端优雅降级。发布 [v0.4.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.4.0) |
