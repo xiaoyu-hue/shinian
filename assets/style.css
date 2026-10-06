@@ -707,3 +707,67 @@ input[type="date"] { color-scheme: dark; }
   .stars i { animation: none; opacity: .6; }
   .rain-drop, .snow-flake { animation: none !important; }
 }
+
+/* ============================================================
+   启动开场（v0.6）· 活的窗景
+   - 背景直接消费 sky.js 写入 :root 的 --sky-top/--sky-bottom，
+     与主界面同一片天，揭示时零跳变（无需单独抽天空函数）
+   - 三节拍：天空苏醒(veil) → 流星引路(meteor) → 窗景浮起(card)
+   - 仅用 transform/opacity（GPU 合成），不动触发重排的属性
+   ============================================================ */
+#splash {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none; overflow: hidden;
+  background: linear-gradient(178deg, var(--sky-top, #030d18) 0%, var(--sky-bottom, #0a3050) 100%);
+  transition: opacity .42s var(--ease-out);
+}
+#splash.gone { opacity: 0; }
+#splash.removed { display: none; }
+.splash-sky { position: absolute; inset: 0; }
+.splash-stars { position: absolute; inset: 0; }
+.splash-stars i {
+  position: absolute; width: 2px; height: 2px; border-radius: 50%;
+  background: rgba(222,236,255,.85); opacity: 0;
+  animation: splashTwinkle 2.4s ease-in-out infinite;
+}
+@keyframes splashTwinkle { 0%, 100% { opacity: .15; } 50% { opacity: .9; } }
+
+/* 流星引路：一次性划过，收尾 opacity:0 自动消失，不进常驻逻辑 */
+.splash-meteor {
+  position: absolute; top: 18%; left: -12%;
+  width: 150px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.95) 100%);
+  box-shadow: 0 0 9px rgba(200,225,255,.85);
+  opacity: 0; transform: rotate(18deg);
+  animation: splashMeteor .65s var(--ease-out) .5s 1 forwards;
+}
+@keyframes splashMeteor {
+  0%   { opacity: 0; transform: translate(0, 0) rotate(18deg); }
+  12%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(125vw, 42vh) rotate(18deg); }
+}
+
+/* 天空苏醒：深蓝面纱淡出，露出真实时刻天空 */
+.splash-veil {
+  position: absolute; inset: 0; background: #030d18; opacity: 1;
+  animation: splashWake .7s var(--ease-out) forwards;
+}
+@keyframes splashWake { to { opacity: 0; } }
+
+/* 窗景浮起：玻璃卡从雾里上浮 */
+.splash-card {
+  position: relative; z-index: 2; padding: 22px 36px; border-radius: var(--radius);
+  text-align: center; opacity: 0; transform: translateY(14px);
+  animation: splashRise .7s var(--ease-out) .9s forwards;
+}
+@keyframes splashRise { to { opacity: 1; transform: translateY(0); } }
+.splash-title { font-size: 30px; font-weight: 600; letter-spacing: .32em; color: var(--text); padding-left: .32em; }
+.splash-sub { margin-top: 8px; font-size: 12px; letter-spacing: .5em; color: var(--text-dim); padding-left: .5em; }
+
+/* 减弱动态：跳过三节拍，静态呈现并快速淡出 */
+@media (prefers-reduced-motion: reduce) {
+  #splash .splash-meteor { display: none; }
+  #splash .splash-veil { opacity: 0; animation: none; }
+  #splash .splash-card { opacity: 1; transform: none; animation: none; }
+}

@@ -1078,6 +1078,43 @@
   }
 
   // ---------- 启动 ----------
+  /* 启动开场（v0.6）：Web 覆盖层接棒原生闪屏，做到"同一片天"无缝揭示
+     - 覆盖层背景直接消费 --sky-* 变量，与主界面天空一致 → 揭示零跳变
+     - 减弱动态时跳过三节拍、极短呈现后快速淡出
+     - 真机：先收起原生闪屏(native)再由 Web 覆盖层淡出；网页版：仅淡出覆盖层 */
+  function initSplash() {
+    var el = document.getElementById('splash');
+    if (!el) return;
+    var box = document.getElementById('splashStars');
+    if (box) {
+      var n = window.innerWidth >= 680 ? 70 : 36;
+      for (var i = 0; i < n; i++) {
+        var s = document.createElement('i');
+        s.style.left = (Math.random() * 100) + '%';
+        s.style.top = (Math.random() * 64) + '%';
+        s.style.animationDelay = (Math.random() * 2.2).toFixed(2) + 's';
+        box.appendChild(s);
+      }
+    }
+    var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    var MIN = reduce ? 220 : 1700;   // 动画总时长 / 减弱动态时极短呈现
+    var MAX = 2600;                  // 安全上限，防卡死
+    var ended = false;
+    function end() {
+      if (ended) return; ended = true;
+      var SP = window.SplashScreen ||
+               (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen);
+      if (SP && typeof SP.hide === 'function') { try { SP.hide(); } catch (e) {} }
+      el.classList.add('gone');
+      setTimeout(function () {
+        el.classList.add('removed');
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 460);
+    }
+    setTimeout(end, MIN);
+    setTimeout(end, MAX);            // 兜底
+  }
+
   function boot() {
     loadSettings();          // 先恢复设置，再渲染，避免动效闪烁
     tickClock();
@@ -1085,6 +1122,7 @@
     initForm();
     initPerfMonitor();
     render();
+    initSplash();           // 启动开场：Web 覆盖层接棒原生闪屏（无插件时仅淡出覆盖层）
     // 许愿池不依赖城市数据，同步初始化（避免城市加载失败时永远不出现）
     initWishes();
     renderWishes();
