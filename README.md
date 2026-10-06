@@ -1,6 +1,6 @@
 # 时念 · ShiNian
 
-> 当前版本 **v0.7.1** · [版本历史与规范](./CHANGELOG.md) · [主站](https://shinian520.pages.dev/)
+> 当前版本 **v0.7.2** · [版本历史与规范](./CHANGELOG.md) · [主站](https://shinian520.pages.dev/)
 
 > 一款装在手机里的「活着的窗景」时间工具——天空随真实时刻、四季与天气流动，
 > 时钟、倒数日、提醒以液态玻璃卡片悬浮其上。**天空是主角，玻璃是舞台。**
@@ -11,7 +11,7 @@
 
 ---
 
-## ✨ 功能（v0.7.1 当前版本）
+## ✨ 功能（v0.7.2 当前版本）
 
 - **天空引擎 · 天文驱动**：黎明 / 清晨 / 正午 / 午后 / 日落 / 暮色 / 深夜，七时段色阶分钟级连续插值。锚点由**真实日出日落时间**动态计算——同一时刻，冬天和夏天看到的是不一样的天
 - **液态玻璃 UI**：玻璃配方随天空亮度自动切换（亮天空 → 磨砂白玻璃深色字；暗天空 → 深海玻璃浅色字），对比度全程满足 WCAG AA
@@ -80,6 +80,9 @@
 | [@capacitor/android](https://capacitorjs.com) | 将网页封装为真实安卓 App（已集成，v0.6 真机化） | MIT |
 | [@capacitor/local-notifications](https://capacitorjs.com) | 本地通知（v0.4 接入，喝水 / 倒数日提醒） | MIT |
 | [@capacitor/splash-screen](https://capacitorjs.com) | 启动画面原生层（v0.6.0 接入，launchAutoHide:false + 深蓝背景，由 Web 开场覆盖层接棒） | MIT |
+| [SunCalc](https://github.com/mourner/suncalc) | 太阳/月亮**高度角与方位角**、月相盈亏、月升月落、黄金时刻（v0.7.0 接入，已 vendored 至 `assets/suncalc.js`，BSD-2 许可头完整保留） | BSD-2-Clause |
+
+**Vendored（随仓库分发，非 npm 依赖）**：`assets/lunar.js`（lunar-javascript，MIT）与 `assets/suncalc.js`（SunCalc，BSD-2）均为「零构建、双击即用」目标而随仓库分发，二者均**保留原始许可与归属头**。
 
 **运行时零框架依赖**——不引入任何前端框架、不引入构建工具。v0.1 时期零网络请求；v0.2 起仅新增一个 Open-Meteo 天气请求（免密钥、不含任何个人信息），且失败时静默降级，不影响时钟与倒数日。
 
@@ -101,11 +104,28 @@
 
 > **为什么自研而不直接引入**：本项目为**零构建**结构（无打包器，`index.html` 双击即用）；且这些库不会适配本仓库已有的降级钩子（`data-no-motion` / `data-low-perf` / `data-no-decor`）与「雨雪天气抑制飘落彩蛋」的天气层共存规则。
 
+### 参考借鉴（v0.7 天穹重构：云彩引擎 v3 + 日月体系）
+
+v0.7 的云与日月同样为**自研实现**，下列项目**未被引入**（保持运行时零依赖），但其思路与工艺给了直接启发，一并致谢：
+
+| 项目 / 来源 | 借鉴点 |
+|---|---|
+| **Inigo Quilez · Domain Warping / fBm** | 云形态的核心数学模型：`fbm(p + fbm(p))` 域翘曲产生有机形态，`smoothstep` 密度阈值清出「云之间的蓝天」——这是根治「云聚成一坨」的关键 |
+| [Cloud Sky（originkit）](https://www.originkit.dev/components/cloud-sky) | 网格放置且多数格子留空、积云「中心以上更高以下更平」的平底、双层 fBm 侵蚀（粗层裂片 / 细层丝缕）、自阴影、远层向天空色混合的雾霭感 |
+| [MiniMax-AI/skills · procedural-noise](https://github.com/MiniMax-AI/skills) | hash → value noise → fBm → 域翘曲 的系统化工艺参考（含公式与逐步实现） |
+| [NousResearch/hermes-agent · p5js skill](https://github.com/NousResearch/hermes-agent) | 逐像素 fBm 的**性能预算表**，用于校准本项目低分辨率云场的目标开销 |
+| [kevinbadi/claude-motion-skills](https://github.com/kevinbadi/claude-motion-skills) | 「渲染 → 截图 → 自检」的交付闭环（本项目据此建立了出图目视验证环节） |
+| [mourner/suncalc](https://github.com/mourner/suncalc) | 日月位置算法（基于 Jean Meeus《Astronomical Algorithms》），东升西落轨迹与月相盈亏的来源 |
+| [MDN · Optimizing canvas](https://developer.mozilla.org/docs/Web/API/Canvas_API/Tutorial/Optimizing_canvas) | 离屏预渲染、整数坐标、低分辨率放大等性能守则 |
+
+> **火烧云的物理依据**：低角度阳光穿过厚大气层后蓝光被散射，剩余红橙光自下方/侧面打在云底，形成「云底橙红 → 中部粉 → 顶部紫蓝」的高度渐变；薄云迎光边缘因强光穿透而发亮（银边效应 / silver lining）。本项目的着色逻辑据此建立。
+
 ### 深深致敬
 
 - **[Open-Meteo](https://open-meteo.com) 团队**：让「没有服务器的个人开发者」也能做天气产品，本项目的零后端路线因你们而成立
 - **[6tail / lunar-javascript](https://github.com/6tail/lunar-javascript)**：把二十四节气算得清清楚楚，「四季的中文逻辑」得以落地
 - **[Ionic / Capacitor](https://capacitorjs.com) 团队**：给网页开发者留了一扇通往真机的大门
+- **[Vladimir Agafonkin / SunCalc](https://github.com/mourner/suncalc) 与 Inigo Quilez**：前者让「日月该在天上哪个位置」变成几行代码，后者让「云该长什么样」有据可依——v0.7 的天穹由此成立
 - **[霞鹜文楷 LXGW WenKai](https://github.com/lxgw/LxgwWenKai) 与 [中文网字计划](https://github.com/Konghayao/cn-font-split)**：姊妹项目主站在用，中文字体网页化的铺路人
 - **每一位为设计系统、无障碍实践与 Web 平台原生能力（CSS 自定义属性、prefers-reduced-motion、backdrop-filter）撰写文档的人**
 

@@ -1,3 +1,15 @@
+/*!
+ * lunar-javascript — 农历 / 二十四节气 / 干支 / 传统节日 计算库
+ * https://github.com/6tail/lunar-javascript
+ *
+ * Copyright (c) 6tail
+ * Licensed under the **MIT** license.
+ *
+ * 时念项目说明（v0.7.2）：
+ *   本文件为 vendored 第三方库（与 assets/suncalc.js 同类做法），零依赖、无构建、随页面一同加载。
+ *   原始版权与 MIT 许可声明予以完整保留，不得移除。
+ *   用于计算：二十四节气（季节切换点「四立」）、农历日期等。
+ */
 ;(function(root,factory){
   if (typeof define==='function'&&define.amd){
     define(factory);
