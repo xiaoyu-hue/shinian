@@ -407,7 +407,7 @@
       for (var i = 0; i < ambient.list.length; i++) {
         var m = ambient.list[i];
         var dx = m.x - x, dy = m.y - y;
-        if (dx * dx + dy * dy <= 2500) {           // 50px 容差，便于手指点中
+        if (dx * dx + dy * dy <= 4900) {           // 70px 容差（v0.7.3 由 50px 放宽，便于手指点中「点流星许愿」彩蛋）
           if (w.ShiNianDecor && typeof w.ShiNianDecor.onMeteorClick === 'function') {
             w.ShiNianDecor.onMeteorClick();
           }
@@ -487,12 +487,30 @@
   /* ---------- 常驻效果调度（setTimeout 排期 + 按需唤醒 rAF） ---------- */
   var ambient = null;   // { eff, list, raf, timer, lastT }
 
+  // 流星配置（v0.7.3）：读 :root[data-meteor] 与 :root[data-meteor-gap]
+  //   data-meteor: off=关闭流星 / real=真实节奏 / custom=按自定义间隔
+  //   data-meteor-gap: 自定义间隔秒数（5~300）
+  // 真实档沿用 40–90 秒；自定义档以设定值为中心 ±30% 抖动——
+  // 既不机械（保住「偶遇」的灵魂），又可预期（便于配合「点流星许愿」彩蛋）。
+  var METEOR_REAL = [40000, 90000];
+  function meteorCfg() {
+    var v = root().getAttribute('data-meteor');
+    if (v === 'off') return { on: false, gapMin: METEOR_REAL[0], gapMax: METEOR_REAL[1] };
+    var raw = +root().getAttribute('data-meteor-gap');
+    if (v === 'custom' && raw > 0) {
+      var ms = Math.max(5, Math.min(300, raw)) * 1000;
+      return { on: true, gapMin: ms * 0.7, gapMax: ms * 1.3 };
+    }
+    return { on: true, gapMin: METEOR_REAL[0], gapMax: METEOR_REAL[1] };
+  }
+
   function ambientAllowed() {
     var r = root();
     if (r.hasAttribute('data-no-motion')) return false;
     if (r.hasAttribute('data-low-perf')) return false;
     if (r.hasAttribute('data-no-decor')) return false;
     if (!enabled) return false;
+    if (!meteorCfg().on) return false;      // v0.7.3 流星独立开关
     return !isDay(hours());          // 仅夜间
   }
 
@@ -507,14 +525,20 @@
   // 调试 ?decor=meteor 时缩短间隔，便于验收
   function gapFor(e) {
     var f = debug();
-    return (f === 'meteor') ? [1500, 4000] : [e.gapMin, e.gapMax];
+    if (f === 'meteor') return [1500, 4000];
+    var mc = meteorCfg();
+    // v0.7.3 首颗提前：进夜间后 8~15 秒先来一颗，保证「必遇一次」，之后回到设定节奏
+    if (!firstMeteorDone) return [8000, 15000];
+    return [mc.gapMin, mc.gapMax];
   }
+  var firstMeteorDone = false;
 
   function scheduleNext() {
     if (!ambient) return;
     var g = gapFor(ambient.eff);
     ambient.timer = setTimeout(function () {
       if (!ambient || !ambientAllowed()) return;
+      firstMeteorDone = true;                              // 首颗已出，后续按设定节奏
       ambient.list = [ambient.eff.spawn()];
       if (canvas) canvas.style.pointerEvents = 'auto';   // 流星出现才接收点击
       ambient.raf = w.requestAnimationFrame(ambientLoop);
@@ -566,6 +590,12 @@
   function boot() {
     setup();
     maybeTrigger();
+    // v0.7.3：设置面板改流星开关/间隔 → 立即按新节奏重排
+    w.addEventListener('meteorModeChange', function () {
+      firstMeteorDone = false;
+      stopAmbient();
+      tickAmbient();
+    });
     setInterval(maybeTrigger, CONF.retry);   // 未命中概率时定期重试
     tickAmbient();                                  // 常驻：夜间启动流星
     setInterval(tickAmbient, CONF.ambientCheck);    // 每分钟复查时段与守卫，天亮即停
@@ -597,7 +627,9 @@
     ambientOnce: ambientOnce,
     _test: {
       guardsPass: guardsPass, timeOK: timeOK, weatherOK: weatherOK, isDay: isDay,
-      CONF: CONF, meteor: meteor, ambientAllowed: ambientAllowed, gapFor: gapFor
+      CONF: CONF, meteor: meteor, ambientAllowed: ambientAllowed, gapFor: gapFor,
+      meteorCfg: meteorCfg,
+      isMeteorFirstDone: function () { return firstMeteorDone; }
     }
   };
 })();

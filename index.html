@@ -144,6 +144,31 @@
         </div>
 
         <div class="set-block">
+          <label class="set-row" for="meteorToggle">
+            <span>流星</span>
+            <button type="button" class="set-toggle on" id="meteorToggle"
+                    role="switch" aria-checked="true" aria-label="流星"></button>
+          </label>
+          <div class="remind-fields" id="meteorFields">
+            <label class="set-row">
+              <span>出现间隔</span>
+              <select id="meteorRate" class="set-input set-select">
+                <option value="real">真实（40–90 秒随机）</option>
+                <option value="30">常见（约 30 秒）</option>
+                <option value="12">频繁（约 12 秒）</option>
+                <option value="custom">自定义…</option>
+              </select>
+            </label>
+            <label class="set-row" id="meteorCustomRow" hidden>
+              <span>自定义秒数</span>
+              <input type="number" id="meteorGap" class="set-input narrow"
+                     min="5" max="300" step="1" value="30">
+            </label>
+            <p class="set-note">流星只在夜间出现；实际间隔会在设定值上下浮动 ±30%，保留偶遇感。划过时轻点它可展开许愿池。</p>
+          </div>
+        </div>
+
+        <div class="set-block">
           <div class="set-label">天气</div>
           <label class="set-row" for="weatherRefreshMin">
             <span>温度自动刷新</span>

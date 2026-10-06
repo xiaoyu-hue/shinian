@@ -762,6 +762,7 @@
     recipe: 'auto', motion: true, decor: true,
     clouds: true, cloudAmount: 'auto',   // v0.7.1 云彩开关与云量档位（auto=跟随天气）
     cloudGap: 'mid',                     // v0.7.1 空窗期：off=连续有云 / short / mid / long
+    meteor: true, meteorRate: 'real', meteorGap: 30,  // v0.7.3 流星：开关 / 间隔档位 / 自定义秒数
     wishCollapsed: true,          // v0.5.9 许愿池默认折叠；用户可自定义并记住
     remindCollapsed: true,        // v0.6.1 提醒模块默认折叠；用户可自定义并记住
     weatherRefreshMin: 5,         // v0.6.2 温度自动刷新间隔（分钟）：0=关闭，可选 5/10/15/30
@@ -785,6 +786,10 @@
         if (['off', 'short', 'mid', 'long'].indexOf(s.cloudGap) !== -1) {
           settings.cloudGap = s.cloudGap;
         }
+        // v0.7.3 流星
+        if (typeof s.meteor === 'boolean') settings.meteor = s.meteor;
+        if (['real', '30', '12', 'custom'].indexOf(s.meteorRate) !== -1) settings.meteorRate = s.meteorRate;
+        if (isFinite(s.meteorGap)) settings.meteorGap = Math.min(300, Math.max(5, Math.round(+s.meteorGap)));
         if (typeof s.wishCollapsed === 'boolean') settings.wishCollapsed = s.wishCollapsed;
         if (typeof s.remindCollapsed === 'boolean') settings.remindCollapsed = s.remindCollapsed;
         if (s.remind && typeof s.remind === 'object') {
@@ -822,6 +827,15 @@
     // v0.7.1 云彩：关闭 → data-cloud=off（云引擎清空）；开启 → 云量档位
     root.setAttribute('data-cloud', settings.clouds ? settings.cloudAmount : 'off');
     root.setAttribute('data-cloud-gap', settings.clouds ? settings.cloudGap : 'off');
+    // v0.7.3 流星：关闭 / 真实 / 自定义秒数
+    root.setAttribute('data-meteor', settings.meteor ? 'on' : 'off');
+    var mRate = settings.meteorRate;
+    if (mRate === 'custom') {
+      root.setAttribute('data-meteor', settings.meteor ? 'custom' : 'off');
+      root.setAttribute('data-meteor-gap', String(settings.meteorGap));
+    } else {
+      root.setAttribute('data-meteor-gap', (mRate === 'real') ? 'real' : mRate);
+    }
     window.dispatchEvent(new CustomEvent('recipeChange'));   // 天空引擎立即重算
     // v0.6.3 · P2：装饰层开关改变时，让运行中的季节彩蛋/流星立即生效或停止。
     // 原仅设置 data-no-decor 属性，已触发的动画要等自身时长结束才停（最长 40s）；
@@ -858,6 +872,14 @@
     if (ca) { ca.value = settings.cloudAmount; ca.disabled = !settings.clouds; }
     var cg = document.getElementById('cloudGap');
     if (cg) { cg.value = settings.cloudGap; cg.disabled = !settings.clouds; }
+    var mtg = document.getElementById('meteorToggle');
+    if (mtg) { mtg.classList.toggle('on', settings.meteor); mtg.setAttribute('aria-checked', String(settings.meteor)); }
+    var mr = document.getElementById('meteorRate');
+    if (mr) { mr.value = settings.meteorRate; mr.disabled = !settings.meteor; }
+    var mg = document.getElementById('meteorGap');
+    if (mg) { mg.value = settings.meteorGap; mg.disabled = !settings.meteor; }
+    var mcr = document.getElementById('meteorCustomRow');
+    if (mcr) mcr.hidden = !(settings.meteor && settings.meteorRate === 'custom');
     var c = document.getElementById('itemCount');
     if (c) c.textContent = load().length;
 
@@ -993,6 +1015,22 @@
     }
     onCloudOptChange(caSel, 'cloudAmount', ['auto', 'sparse', 'normal', 'dense']);
     onCloudOptChange(document.getElementById('cloudGap'), 'cloudGap', ['off', 'short', 'mid', 'long']);
+
+    // v0.7.3 流星开关与间隔
+    var mtEl = document.getElementById('meteorToggle');
+    if (mtEl) mtEl.addEventListener('click', function () {
+      window.dispatchEvent(new CustomEvent('meteorModeChange'));
+    });
+    onCloudOptChange(document.getElementById('meteorRate'), 'meteorRate', ['real', '30', '12', 'custom']);
+    var mgEl = document.getElementById('meteorGap');
+    if (mgEl) mgEl.addEventListener('change', function () {
+      var v = Math.round(+mgEl.value);
+      if (!isFinite(v)) return;
+      settings.meteorGap = Math.min(300, Math.max(5, v));
+      mgEl.value = settings.meteorGap;
+      saveSettings(); applySettings(); haptic(8);
+      window.dispatchEvent(new CustomEvent('meteorModeChange'));
+    });
 
     // 本地提醒
     function bindRemindToggle(id, key) {
