@@ -127,6 +127,35 @@
     });
   }
 
+  // 许愿池到期提醒：给「填了日期且未完成」、且恰好今天到期（diff===0）的心愿，
+  // 在 wishTime 一次性提醒；今天的提醒时刻已过则不再补发（避免出现迟来提醒）
+  function scheduleWishes(wishes, cfg) {
+    var ln = getPlugin();
+    if (!ln) return Promise.resolve({ ok: false, reason: 'unavailable' });
+    var due = (wishes || []).filter(function (w) {
+      return w && !w.done && w.date && w.diff === 0;
+    });
+    if (!due.length) return Promise.resolve({ ok: true, count: 0 });
+    return ensurePermission().then(function (granted) {
+      if (!granted) return { ok: false, reason: 'permission' };
+      var now = new Date();
+      var at = atTimeToday(cfg.wishTime || '09:00');
+      if (at <= now) return { ok: true, count: 0 };   // 今天的提醒时刻已过，不补发
+      var nots = due.map(function (w, i) {
+        return {
+          id: 300000 + i,
+          title: '心愿到期提醒 🌠',
+          body: '「' + String(w.text || '').slice(0, 30) + '」今天该去实现了，加油～',
+          schedule: { at: at, allowWhileIdle: true },
+          extra: { kind: 'wish', wishId: w.id }
+        };
+      });
+      return ln.schedule({ notifications: nots }).then(function () {
+        return { ok: true, count: nots.length };
+      }).catch(function (e) { return { ok: false, reason: 'schedule', error: String(e) }; });
+    });
+  }
+
   function cancelAll() {
     var ln = getPlugin();
     if (!ln) return Promise.resolve();
@@ -135,7 +164,7 @@
   }
 
   // 统一入口：先清空再按设置重排（网页端 getPlugin 为 null，直接返回 unavailable）
-  function apply(cfg, countdownItems) {
+  function apply(cfg, countdownItems, wishes) {
     var ln = getPlugin();
     if (!ln) return Promise.resolve({ ok: false, reason: 'unavailable', available: false });
     return cancelAll().then(function () {
@@ -149,6 +178,11 @@
       if (cfg.cd && countdownItems && countdownItems.length) {
         chain = chain.then(function () {
           return scheduleCountdown(countdownItems, cfg).then(function (r) { results.push(['cd', r]); });
+        });
+      }
+      if (cfg.wishRemind && wishes && wishes.length) {
+        chain = chain.then(function () {
+          return scheduleWishes(wishes, cfg).then(function (r) { results.push(['wish', r]); });
         });
       }
       return chain.then(function () { return { ok: true, available: true, results: results }; });

@@ -443,6 +443,17 @@ main {
 .wish-empty { padding: 10px 0; font-size: 13px; color: var(--text-faint); }
 .wish-actions { margin-top: 8px; }
 
+/* 许下心愿：化星升空 */
+.wish-star { position: fixed; width: 7px; height: 7px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 10px 3px rgba(255,240,200,.75);
+  pointer-events: none; z-index: 60; }
+/* 完成微反馈 */
+.wish-check.pop { animation: wishPop .45s ease-out; }
+@keyframes wishPop { 0% { transform: scale(1); } 40% { transform: scale(1.35); }
+                     100% { transform: scale(1); } }
+:root[data-no-motion] .wish-check.pop { animation: none; }
+:root[data-no-motion] .wish-star { display: none; }
+
 /* ---- v0.5.7 提醒模块（主页面 · 倒数日下方，从设置面板下放） ---- */
 .remind-card { padding: 14px 16px; }
 .remind-hint { margin: 0 0 12px; font-size: 12px; line-height: 1.6;

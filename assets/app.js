@@ -133,6 +133,7 @@
   var lastDiffs = {};        // 上次渲染的天数，用于判断数字是否需要翻转
 
   // 许愿池渲染：未完成在前，已完成沉底
+  var lastDoneWishId = null;
   function renderWishes() {
     var list = loadWishes();
     var ul = document.getElementById('wishList');
@@ -156,6 +157,7 @@
       chk.setAttribute('aria-checked', w.done ? 'true' : 'false');
       chk.setAttribute('aria-label', (w.done ? '取消完成：' : '标记完成：') + w.text);
       chk.textContent = w.done ? '\u2713' : '';
+      if (w.done && w.id === lastDoneWishId) chk.classList.add('pop');   // 完成微反馈
       chk.addEventListener('click', function () {
         var l = loadWishes();
         for (var i = 0; i < l.length; i++) {
@@ -165,7 +167,8 @@
             break;
           }
         }
-        saveWishes(l); renderWishes(); haptic(10);
+        lastDoneWishId = w.done ? w.id : null;
+        saveWishes(l); renderWishes(); applyReminders(); haptic(10);
       });
 
       var txt = document.createElement('span');
@@ -199,6 +202,25 @@
     if (clearBtn) clearBtn.hidden = done.length === 0;
     if (total) total.textContent = String(list.length);
     if (dn) dn.textContent = String(done.length);
+  }
+
+  // 许下心愿：化作一颗星升入夜空（尊重「减弱动态」）
+  function wishStar(fromEl) {
+    if (document.documentElement.hasAttribute('data-no-motion')) return;
+    if (!fromEl || !fromEl.animate) return;
+    var rect = fromEl.getBoundingClientRect();
+    var el = document.createElement('i');
+    el.className = 'wish-star';
+    el.style.left = (rect.left + rect.width / 2) + 'px';
+    el.style.top = (rect.top + rect.height / 2) + 'px';
+    document.body.appendChild(el);
+    var anim = el.animate([
+      { transform: 'translate(-50%,-50%) scale(.5)', opacity: 0 },
+      { transform: 'translate(-50%,-60px) scale(1)', opacity: 1, offset: .22 },
+      { transform: 'translate(-50%,-170px) scale(.75)', opacity: .9, offset: .62 },
+      { transform: 'translate(-50%,-300px) scale(.25)', opacity: 0 }
+    ], { duration: 680, easing: 'cubic-bezier(.2,.6,.3,1)' });
+    anim.onfinish = function () { if (el.parentNode) el.parentNode.removeChild(el); };
   }
 
   // 许愿池交互：折叠、许下、清空已完成
@@ -240,9 +262,11 @@
           done: false, doneAt: null, targetId: null
         });
         saveWishes(list);
+        wishStar(input);
         input.value = '';
         if (dateEl) dateEl.value = '';
         renderWishes();
+        applyReminders();                       // 新心愿可能带来到期提醒，立即重排
         if (collapsed) {                       // 首次许愿后自动展开一次
           collapsed = false;
           settings.wishCollapsed = false;
@@ -251,6 +275,21 @@
         }
         haptic(12);
       });
+    }
+
+    // 流星联动：点击划过的流星 → 展开许愿池并聚焦输入框
+    if (window.ShiNianDecor) {
+      window.ShiNianDecor.onMeteorClick = function () {
+        if (collapsed) {
+          collapsed = false;
+          settings.wishCollapsed = false;
+          saveSettings();
+          applyCollapsed();
+        }
+        var el = document.getElementById('wishText');
+        if (el) el.focus();
+        haptic(8);
+      };
     }
 
     var clearDone = document.getElementById('wishClearDone');
@@ -656,7 +695,8 @@
     recipe: 'auto', motion: true, decor: true,
     wishCollapsed: true,          // v0.5.9 许愿池默认折叠；用户可自定义并记住
     remind: { water: false, waterIntervalH: 2, quietStart: 22, quietEnd: 8,
-              cd: false, cdTime: '08:00', cdLeadTime: '20:00' }
+              cd: false, cdTime: '08:00', cdLeadTime: '20:00',
+              wishRemind: true, wishTime: '09:00' }   // v0.5.9 许愿池到期提醒（默认开，用户可关）
   };
 
   function loadSettings() {
@@ -676,6 +716,8 @@
           if (typeof r.cd === 'boolean') settings.remind.cd = r.cd;
           if (typeof r.cdTime === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(r.cdTime)) settings.remind.cdTime = r.cdTime;
           if (typeof r.cdLeadTime === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(r.cdLeadTime)) settings.remind.cdLeadTime = r.cdLeadTime;
+          if (typeof r.wishRemind === 'boolean') settings.remind.wishRemind = r.wishRemind;
+          if (typeof r.wishTime === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(r.wishTime)) settings.remind.wishTime = r.wishTime;
         }
       }
     } catch (e) {}
@@ -702,7 +744,11 @@
     var items = load().map(function (it) {
       return { id: it.id, name: it.name, date: it.date, diff: dayDiff(it.date) };
     }).filter(function (it) { return it.diff === 0 || it.diff === 1; });
-    window.ShiNianRemind.apply(settings.remind, items);
+    var wishes = loadWishes().map(function (w) {
+      return { id: w.id, text: w.text, done: w.done, date: w.date,
+               diff: w.date ? dayDiff(w.date) : null };
+    });
+    window.ShiNianRemind.apply(settings.remind, items, wishes);
   }
 
   function syncSettingsUI() {
@@ -731,6 +777,10 @@
     if (ct) ct.value = settings.remind.cdTime;
     var clt = document.getElementById('cdLeadTime');
     if (clt) clt.value = settings.remind.cdLeadTime;
+    var wrt = document.getElementById('wishRemindToggle');
+    if (wrt) { wrt.classList.toggle('on', settings.remind.wishRemind); wrt.setAttribute('aria-checked', String(settings.remind.wishRemind)); }
+    var wtm = document.getElementById('wishTime');
+    if (wtm) wtm.value = settings.remind.wishTime;
 
     // 网页端（无原生桥）显示提示；App 内可用则隐藏
     var rh = document.getElementById('remindHint');
@@ -838,6 +888,7 @@
     }
     bindRemindToggle('remindToggle', 'water');
     bindRemindToggle('cdRemindToggle', 'cd');
+    bindRemindToggle('wishRemindToggle', 'wishRemind');
 
     function bindRemindInput(id, key, parse) {
       var el = document.getElementById(id);
@@ -852,6 +903,7 @@
     bindRemindInput('remindInterval', 'waterIntervalH', function (v) { var n = parseFloat(v); return (isFinite(n) && n >= 0.5 && n <= 12) ? n : null; });
     bindRemindInput('remindQuietStart', 'quietStart', function (v) { var n = parseInt(v, 10); return (isNaN(n) || n < 0 || n > 23) ? null : n; });
     bindRemindInput('remindQuietEnd', 'quietEnd', function (v) { var n = parseInt(v, 10); return (isNaN(n) || n < 0 || n > 23) ? null : n; });
+    bindRemindInput('wishTime', 'wishTime', function (v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v) ? v : null; });
     bindRemindInput('cdRemindTime', 'cdTime', function (v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v) ? v : null; });
     bindRemindInput('cdLeadTime', 'cdLeadTime', function (v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v) ? v : null; });
 

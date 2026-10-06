@@ -382,6 +382,7 @@
     if (!ctx) { canvas = null; return null; }   // 环境不支持 2d 上下文，静默放弃
     resize();
     w.addEventListener('resize', resize);
+    bindMeteorClick();
     return canvas;
   }
 
@@ -394,6 +395,26 @@
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // 点击划过的流星 → 触发回调（由 app.js 设置为「展开许愿池并聚焦」）
+  function bindMeteorClick() {
+    if (!canvas) return;
+    canvas.addEventListener('click', function (ev) {
+      if (!ambient || !ambient.list || !ambient.list.length) return;
+      var r = canvas.getBoundingClientRect();
+      var x = ev.clientX - r.left, y = ev.clientY - r.top;
+      for (var i = 0; i < ambient.list.length; i++) {
+        var m = ambient.list[i];
+        var dx = m.x - x, dy = m.y - y;
+        if (dx * dx + dy * dy <= 2500) {           // 50px 容差，便于手指点中
+          if (w.ShiNianDecor && typeof w.ShiNianDecor.onMeteorClick === 'function') {
+            w.ShiNianDecor.onMeteorClick();
+          }
+          return;
+        }
+      }
+    });
   }
 
   function cancel() { if (raf) { w.cancelAnimationFrame(raf); raf = null; } }
@@ -495,6 +516,7 @@
     ambient.timer = setTimeout(function () {
       if (!ambient || !ambientAllowed()) return;
       ambient.list = [ambient.eff.spawn()];
+      if (canvas) canvas.style.pointerEvents = 'auto';   // 流星出现才接收点击
       ambient.raf = w.requestAnimationFrame(ambientLoop);
     }, rand(g[0], g[1]));
   }
@@ -517,6 +539,7 @@
       ambient.raf = null;
       ambient.lastT = 0;
       ctx.clearRect(0, 0, W, H);
+      if (canvas) canvas.style.pointerEvents = 'none';   // 结束后立即收回
       scheduleNext();
       return;
     }
