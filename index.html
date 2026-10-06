@@ -27,13 +27,13 @@
   </script>
   <script src="assets/notifications.js" defer></script>
   <script src="assets/decor.js" defer></script>
+  <script src="assets/intro.js" defer></script>
   <script src="assets/app.js" defer></script>
 </head>
 <body>
-  <!-- 启动开场（v0.6）：活的窗景 · 天空苏醒 → 流星引路 → 窗景浮起 -->
+  <!-- 启动开场（v0.6.4）：活窗景 · canvas 星场苏醒 → 多流星引路 → 玻璃卡浮起 -->
   <div id="splash" aria-hidden="true">
-    <div class="splash-stars" id="splashStars"></div>
-    <div class="splash-meteor"></div>
+    <canvas id="splashCanvas" class="splash-canvas" aria-hidden="true"></canvas>
     <div class="splash-card glass">
       <div class="splash-title">时念</div>
       <div class="splash-sub">窗景正醒</div>

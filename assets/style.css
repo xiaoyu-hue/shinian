@@ -744,12 +744,13 @@ input[type="date"] { color-scheme: dark; }
 }
 
 /* ============================================================
-   启动开场（v0.6.1）· 活的窗景 · 固定品牌夜空
-   - 背景固定为品牌深夜渐变（不复用实时天空），与主页形成明确「开幕」仪式感
-   - 动画仅在 .splash-run 后触发，确保原生闪屏淡出后再完整播放
+   启动开场（v0.6.4）· 活的窗景 · canvas 星场 + 多流星
+   - 背景仍固定为品牌深夜渐变（配色体系未变），与主页形成明确「开幕」仪式感
+   - 星场与多颗流星由 intro.js 在 #splashCanvas 上渲染（分层辉光 + 渐变拖尾）
+   - 动画在 .splash-run 后触发，确保原生闪屏淡出后再完整播放
      （修复 v0.6.0「原生与 Web 同时收起、Web 仅露脸 0.46s」的看不到问题）
-   - 三节拍：星点呼吸 → 流星引路 → 玻璃卡上浮
-   - 仅用 transform/opacity（GPU 合成）
+   - 三节拍：星场苏醒 → 流星引路 → 玻璃卡上浮
+   - 玻璃卡仍用 transform/opacity（GPU 合成）；星场/流星走 canvas
    ============================================================ */
 #splash {
   position: fixed; inset: 0; z-index: 9999;
@@ -762,31 +763,8 @@ input[type="date"] { color-scheme: dark; }
 }
 #splash.gone { opacity: 0; }
 #splash.removed { display: none; }
-.splash-sky { position: absolute; inset: 0; }
-.splash-stars { position: absolute; inset: 0; }
-.splash-stars i {
-  position: absolute; width: 2px; height: 2px; border-radius: 50%;
-  background: rgba(222,236,255,.9); opacity: .55;
-}
-#splash.splash-run .splash-stars i { animation: splashTwinkle 2.6s ease-in-out infinite; }
-@keyframes splashTwinkle { 0%, 100% { opacity: .2; } 50% { opacity: .95; } }
-
-/* 流星引路：清晰可见的拖尾，深色背景上醒目（v0.6.1 加粗加亮修复不可见问题） */
-.splash-meteor {
-  position: absolute; top: 22%; left: -18%;
-  width: 230px; height: 3px; border-radius: 3px;
-  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(170,210,255,.9) 72%, #ffffff 100%);
-  box-shadow: 0 0 16px 3px rgba(150,200,255,.85);
-  opacity: 0;
-}
-#splash.splash-run .splash-meteor {
-  animation: splashMeteor .85s var(--ease-out) .35s 1 forwards;
-}
-@keyframes splashMeteor {
-  0%   { opacity: 0; transform: translate(0, 0) rotate(20deg); }
-  10%  { opacity: 1; }
-  100% { opacity: 0; transform: translate(130vw, 47vh) rotate(20deg); }
-}
+/* canvas 星场 + 多流星（v0.6.4 · 由 intro.js 渲染，沿用冷蓝白基调，不改动配色体系） */
+.splash-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
 
 /* 窗景浮起：玻璃卡从雾里上浮 */
 .splash-card {
@@ -798,8 +776,7 @@ input[type="date"] { color-scheme: dark; }
 .splash-title { font-size: 34px; font-weight: 600; letter-spacing: .34em; color: var(--text); padding-left: .34em; }
 .splash-sub { margin-top: 10px; font-size: 12px; letter-spacing: .55em; color: var(--text-dim); padding-left: .55em; }
 
-/* 减弱动态：跳过三节拍，静态呈现并快速淡出 */
+/* 减弱动态：跳过流星与闪烁，静态呈现并快速淡出（星场由 intro.js 直绘静态星） */
 @media (prefers-reduced-motion: reduce) {
-  #splash .splash-meteor { display: none; }
   #splash .splash-card { opacity: 1; transform: none; animation: none; }
 }

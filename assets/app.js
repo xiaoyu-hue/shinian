@@ -1173,53 +1173,58 @@
   }
 
   // ---------- 启动 ----------
-  /* 启动开场（v0.6）：Web 覆盖层接棒原生闪屏，做到"同一片天"无缝揭示
-     - 覆盖层背景直接消费 --sky-* 变量，与主界面天空一致 → 揭示零跳变
-     - 减弱动态时跳过三节拍、极短呈现后快速淡出
-     - 真机：先收起原生闪屏(native)再由 Web 覆盖层淡出；网页版：仅淡出覆盖层 */
+  /* 启动开场（v0.6.4）：Web 覆盖层接棒原生闪屏
+     - 星场与多颗流星由 intro.js 在 #splashCanvas 上渲染（分层辉光 + 渐变拖尾）
+     - 减弱动态时跳过流星与闪烁，静态呈现并快速淡出
+     - 真机：先收起原生闪屏(native)，用双 rAF 等其淡出首帧后再播 Web 开场；
+       网页版：直接播放 Web 开场。兜底计时器保证绝不卡在启动画面 */
   function initSplash() {
     var el = document.getElementById('splash');
     if (!el) return;
-    var box = document.getElementById('splashStars');
-    if (box) {
-      var n = window.innerWidth >= 680 ? 70 : 38;
-      for (var i = 0; i < n; i++) {
-        var s = document.createElement('i');
-        s.style.left = (Math.random() * 100) + '%';
-        s.style.top = (Math.random() * 64) + '%';
-        s.style.animationDelay = (Math.random() * 2.4).toFixed(2) + 's';
-        box.appendChild(s);
-      }
-    }
+    var canvas = document.getElementById('splashCanvas');
     var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    var MIN = reduce ? 320 : 1500;   // 三节拍总时长（含停留）；减弱动态时极短呈现
-    var MAX = 2400;                  // 安全上限，防卡死
+    var MIN = reduce ? 320 : 2700;   // 开场总时长（非减弱：星场苏醒 + 多流星引路 + 停留）
+    var MAX = 3400;                  // 安全上限，防卡死
     var ended = false;
     function end() {
       if (ended) return; ended = true;
+      if (window.ShiNianIntro && window.ShiNianIntro.stop) window.ShiNianIntro.stop();
       el.classList.add('gone');
       setTimeout(function () {
         el.classList.add('removed');
         if (el.parentNode) el.parentNode.removeChild(el);
       }, 520);
     }
-    // 原生闪屏（Capacitor 插件）存在时：先收起它，待其淡出后再触发 Web 开场，
-    // 避免 v0.6.0「原生与 Web 同时收起、Web 仅露脸 0.46s」的看不到问题
-    function reveal() {
+    function startWeb() {
       el.classList.add('splash-run');
-      setTimeout(end, MIN);
+      if (window.ShiNianIntro && canvas) {
+        window.ShiNianIntro.start(canvas, {
+          reduce: reduce,
+          onDone: function () { setTimeout(end, 320); }   // 流星收尾后稍作停留再淡出
+        });
+      }
+      setTimeout(end, MIN);   // onDone 未触发时的兜底（如 canvas 不可用）
       setTimeout(end, MAX);
     }
+    // 原生闪屏（Capacitor 插件）存在时：先收起它，等首帧绘制后再触发 Web 开场，
+    // 避免 v0.6.0「原生与 Web 同时收起、Web 仅露脸 0.46s」的看不到问题
     var SP = window.SplashScreen ||
              (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen);
     try {
       if (SP && typeof SP.hide === 'function') {
         SP.hide();
-        setTimeout(reveal, 320);     // 等原生层淡出后再播放 Web 开场
+        // 双 rAF 等原生层至少完成一帧淡出，再播 Web 开场（比固定 320ms 更顺滑）
+        if (window.requestAnimationFrame) {
+          window.requestAnimationFrame(function () {
+            window.requestAnimationFrame(function () { setTimeout(startWeb, 120); });
+          });
+        } else {
+          setTimeout(startWeb, 320);
+        }
       } else {
-        reveal();
+        startWeb();
       }
-    } catch (e) { reveal(); }
+    } catch (e) { startWeb(); }
   }
 
   // 提醒模块折叠（v0.6.1 · 参考许愿池）：summary 显示开关状态，点击展开/收起，状态记住
