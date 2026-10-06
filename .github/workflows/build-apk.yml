@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'APK 上传到哪个 Release（tag 名，如 v0.3.0）'
+        description: 'APK 上传到哪个 Release（tag 名，如 v0.6.1）'
         required: true
-        default: 'v0.3.0'
+        default: 'v0.6.1'
 
 jobs:
   build:
@@ -43,22 +43,54 @@ jobs:
       - name: 同步 Web 资源到 Android
         run: npx cap sync android
 
-      - name: 构建 Debug APK
+      # 签名准备：仅在仓库配置了 KEYSTORE_BASE64 等 Secrets 时才走正式签名包
+      - name: 准备签名（如配置了 Secrets）
+        id: sign
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            echo "has_sign=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_sign=0" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: 构建 Release APK（已签名 · 正式包）
+        if: steps.sign.outputs.has_sign == '1'
+        working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          bash gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file="$(pwd)/app/release.keystore" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+
+      # 容错降级：未配置签名时仍产出可安装的 Debug APK（用 debug 签名）
+      - name: 构建 Debug APK（未配置签名时的可安装降级包）
+        if: steps.sign.outputs.has_sign != '1'
         working-directory: android
         run: bash gradlew assembleDebug --no-daemon
 
-      - name: 验证 APK 文件
-        run: |
-          ls -lh android/app/build/outputs/apk/debug/app-debug.apk
-          file android/app/build/outputs/apk/debug/app-debug.apk
-
       - name: 重命名 APK（带版本号）
-        run: mv android/app/build/outputs/apk/debug/app-debug.apk shinian-${{ github.event.inputs.release_tag }}-debug.apk
+        run: |
+          if [ "$SIGNED" = "1" ]; then
+            mv android/app/build/outputs/apk/release/app-release.apk shinian-${{ github.event.inputs.release_tag }}-release.apk
+          else
+            mv android/app/build/outputs/apk/debug/app-debug.apk shinian-${{ github.event.inputs.release_tag }}-debug.apk
+          fi
+          ls -lh shinian-${{ github.event.inputs.release_tag }}-*.apk
+        env:
+          SIGNED: ${{ steps.sign.outputs.has_sign }}
 
       - name: 上传 APK 到指定 Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload ${{ github.event.inputs.release_tag }} shinian-${{ github.event.inputs.release_tag }}-debug.apk \
-            --repo ${{ github.repository }} \
-            --clobber
+          APK=$(ls shinian-${{ github.event.inputs.release_tag }}-*.apk | head -1)
+          gh release upload ${{ github.event.inputs.release_tag }} "$APK" \
+            --repo ${{ github.repository }} --clobber
