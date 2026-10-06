@@ -1,4 +1,4 @@
-/* 时念 · 开场引擎（v0.6.5）
+/* 时念 · 开场引擎（v0.6.6）
    - 背景由 sky.js 的 --sky-top/--sky-bottom 实时绘制「此刻真实天色」（白天蓝天 / 深夜星海）
    - 云：调用共享 ShiNianClouds 引擎（随机大小/数量/形态 + 噪声漂移 + 时刻染色）
    - 星场：分层辉光星点，透明度乘 --stars-o（白天自动隐星）
@@ -95,13 +95,16 @@
     _resize: function () {
       var c = this._canvas;
       if (!c) return;
-      var dpr = Math.min((window.devicePixelRatio || 1), 2);
+      // v0.6.6：消费云引擎设备分级（桌面 DPR≤2 / 移动 DPR≤1.5 + 内部渲染分辨率缩放）
+      var q = (window.ShiNianClouds && ShiNianClouds.config) ? ShiNianClouds.config({}) : null;
+      var dpr = Math.min((window.devicePixelRatio || 1), q ? q.dpr : 2);
+      var rs = q ? (q.resScale || 1) : 1;
       var w = c.clientWidth || window.innerWidth || 360;
       var h = c.clientHeight || window.innerHeight || 640;
-      c.width = Math.max(1, Math.round(w * dpr));
-      c.height = Math.max(1, Math.round(h * dpr));
-      this._ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this._w = w; this._h = h; this._dpr = dpr;
+      c.width = Math.max(1, Math.round(w * dpr * rs));
+      c.height = Math.max(1, Math.round(h * dpr * rs));
+      this._ctx.setTransform(dpr * rs, 0, 0, dpr * rs, 0, 0);
+      this._w = w; this._h = h; this._dpr = dpr; this._resScale = rs;
     },
 
     _build: function () {

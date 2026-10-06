@@ -4,12 +4,12 @@
 
 | 元信息 | 内容 |
 |---|---|
-| 文档版本 | v0.6.5（与当前交付对齐） |
-| 状态 | ✅ v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4 / v0.5.5 / v0.5.6 / v0.5.7 / v0.5.9 / v0.6.0（启动画面）/ v0.6.1（启动修复 + 容错 + 提醒折叠）/ v0.6.2（天气温度自动刷新）/ v0.6.3（审查修复：稳定性 / 安全 / 可访问性）/ v0.6.4（启动开场动画重构：canvas 星场 + 多流星 + 双 rAF 接棒）/ v0.6.5（云彩体系 + 开场联动真实天空：共享云引擎 + 天气联动 + 主天空同一片天）已交付；v0.6 其余子项（手机安装实测、通知重启恢复）进行中 |
+| 文档版本 | v0.6.6（与当前交付对齐） |
+| 状态 | ✅ v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4 / v0.5.5 / v0.5.6 / v0.5.7 / v0.5.9 / v0.6.0（启动画面）/ v0.6.1（启动修复 + 容错 + 提醒折叠）/ v0.6.2（天气温度自动刷新）/ v0.6.3（审查修复：稳定性 / 安全 / 可访问性）/ v0.6.4（启动开场动画重构：canvas 星场 + 多流星 + 双 rAF 接棒）/ v0.6.5（云彩体系 + 开场联动真实天空：共享云引擎 + 天气联动 + 主天空同一片天）/ v0.6.6（云彩体系深度优化：真实云物理 + 移动/桌面分级）已交付；v0.6 其余子项（手机安装实测、通知重启恢复）进行中 |
 | 作者 | xiaoyu-hue |
 | 创建日期 | 2026-10-04 |
 | 最后更新 | 2026-10-06 |
-| 交付版本 | [v0.4.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.4.0) · [v0.5.9](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.5.9) · [v0.6.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.0) · [v0.6.1](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.1) · [v0.6.2](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.2) · [v0.6.3](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.3) · [v0.6.4](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.4) · [v0.6.5](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.5) · [主站](https://shinian520.pages.dev/) · [备用副站](https://xiaoyu-hue.github.io/shinian/) |
+| 交付版本 | [v0.4.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.4.0) · [v0.5.9](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.5.9) · [v0.6.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.0) · [v0.6.1](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.1) · [v0.6.2](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.2) · [v0.6.3](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.3) · [v0.6.4](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.4) · [v0.6.5](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.5) · [v0.6.6](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.6) · [主站](https://shinian520.pages.dev/) · [备用副站](https://xiaoyu-hue.github.io/shinian/) |
 | 关联文档 | [PLAN.md](./PLAN.md)、[PLAN-v0.2.md](./PLAN-v0.2.md)、[CHANGELOG.md](../CHANGELOG.md)（版本规范与历史）、主站 `docs/DESIGN_CONTRACT.md`（视觉令牌体系的源头） |
 
 ---
@@ -186,3 +186,4 @@
 | 2026-10-06 | v0.6.1 交付 | 启动画面修复（固定品牌夜空 + `.splash-run` 闸门，修复 v0.6.0 仅闪现 0.46s 的时序 bug）+ APK 容错加固（全局错误捕获 / `safe()` 包裹初始化 / 3.5s 启动兜底网 / 城市天气失败降级）+ 提醒模块折叠（参考许愿池，默认折叠、显示已开启 N 项）；构建支持正式签名（Secrets 驱动，未配置降级 debug）。发布 [v0.6.1](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.1) |
 | 2026-10-06 | v0.6.2 交付 | 天气温度自动刷新（v0.2 天气维度内增强）：设置可选间隔（关闭 / 5 / 10 / 15 / 30 分钟，默认 5）按间隔自动拉取实时温度（绕过 15 分钟缓存）；切后台暂停、回前台立即刷新；手动 ↻ 刷新保留；失败静默降级；附带 `?wrf=秒数` 调试钩子。同步 README / CHANGELOG / PRD；未触发 APK 构建（用户暂不需要正式包）。发布 [v0.6.2](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.2) |
 | 2026-10-06 | v0.6.3 交付 | 审查修复（稳定性 / 安全 / 可访问性）：自动刷新失败不再清空温度（保留上次有效温度）；新增 CSP 纵深防御、键盘焦点环（WCAG 2.4.7）、自动刷新单测接入 npm test、部署清单补齐 5 个被引用 JS（weather/sky/season/lunar/cities）；save() 容错对齐、关闭装饰即时停效果、cities.js 死引用清理。同步 README / CHANGELOG / PRD。发布 [v0.6.3](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.3) |
+| 2026-10-06 | v0.6.6 交付 | 云彩体系深度优化（真实云物理 + 移动/桌面分级）：深度重写 `assets/clouds.js`——真实云物理（多层视差 + 积云/层云/风暴/雾/卷云真实云型 + 太阳方位光照明暗）+ 天气联动增强（晴→积云 / 阴雾→层云 / 雨雷→风暴）+ 移动/桌面深度分级（移动端 2 层 DPR1.5/0.62×/24fps，桌面端 3 层 DPR2/1.0×/30fps）；调用方消费 `ShiNianClouds.config()`；`test_clouds.js` 增至 24 项断言。同步 README / CHANGELOG / PRD。发布 [v0.6.6](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.6) |

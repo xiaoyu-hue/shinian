@@ -1245,23 +1245,27 @@
     } catch (e) { startWeb(); }
   }
 
-  // v0.6.5：主天空云彩层（共享 ShiNianClouds 引擎，与开场同一片云）
+  // v0.6.6：主天空云彩层（共享 ShiNianClouds 引擎，与开场同一片云）
   function initSkyClouds() {
     var cv = document.getElementById('cloudCanvas');
     if (!cv || !window.ShiNianClouds) return;
     var ctx = cv.getContext('2d');
     if (!ctx) return;
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // v0.6.6：消费云引擎设备分级（桌面 3 层 / DPR≤2 / 内部 1.0 / FPS30；移动 2 层 / DPR≤1.5 / 内部 0.62 / FPS24）
+    var q = window.ShiNianClouds.config({});
+    var dpr = Math.min(window.devicePixelRatio || 1, q.dpr);
+    var rs = q.resScale || 1;
     var field = window.ShiNianClouds.create({ w: window.innerWidth, h: window.innerHeight });
-    field.setWeather();      // 按当前 data-weather 设定云量与浓度
-    var FPS = 30, step = 1000 / FPS, acc = 0, last = 0, raf = 0;
+    field.setWeather();      // 按当前 data-weather 设定云型/浓度/亮度
+    var FPS = q.fps || 30, step = 1000 / FPS, acc = 0, last = 0, raf = 0;
     var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     function resize() {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = Math.min(window.devicePixelRatio || 1, q.dpr);
+      rs = q.resScale || 1;
       var w = window.innerWidth, h = window.innerHeight;
-      cv.width = Math.max(1, Math.round(w * dpr));
-      cv.height = Math.max(1, Math.round(h * dpr));
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cv.width = Math.max(1, Math.round(w * dpr * rs));
+      cv.height = Math.max(1, Math.round(h * dpr * rs));
+      ctx.setTransform(dpr * rs, 0, 0, dpr * rs, 0, 0);
       field.resize(w, h);
     }
     resize();
