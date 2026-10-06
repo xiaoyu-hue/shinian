@@ -534,6 +534,7 @@
   var CITY_KEY = 'shinian.city.v1';
   var DEFAULT_CITY = {name:'北京',lat:39.9042,lon:116.4074};
   var currentCity = DEFAULT_CITY;
+  var lastWeather = null;   // v0.6.5：缓存最近一次天气数据，供开场环境微行使用
   var allCities = [];
 
   function loadCities() {
@@ -668,6 +669,7 @@
       root.removeAttribute('data-weather');
       return;
     }
+    lastWeather = weatherData;   // v0.6.5：缓存，供开场环境微行（城市 · 天气 · 温度）
 
     var code = weatherData.weatherCode;
     var isDay = weatherData.isDay;   // 0=夜间 1=白天（weather.js 已回传）
@@ -1172,9 +1174,20 @@
     requestAnimationFrame(sample);
   }
 
+  // 开场环境微行：城市 · 天气 · 温度（无数据时返回 ''，由 intro.js 隐藏该行）
+  function buildSplashEnv() {
+    if (!lastWeather) return '';
+    var w = document.documentElement.getAttribute('data-weather');
+    var map = { clear: '晴', 'partly-cloudy': '多云', cloudy: '阴', fog: '雾',
+                drizzle: '毛毛雨', rain: '雨', snow: '雪', thunderstorm: '雷阵雨' };
+    var txt = map[w] || '';
+    var city = lastWeather.city ? lastWeather.city + ' · ' : '';
+    return city + (txt ? txt + ' ' : '') + Math.round(lastWeather.temperature) + '°';
+  }
+
   // ---------- 启动 ----------
-  /* 启动开场（v0.6.4）：Web 覆盖层接棒原生闪屏
-     - 星场与多颗流星由 intro.js 在 #splashCanvas 上渲染（分层辉光 + 渐变拖尾）
+  /* 启动开场（v0.6.5）：Web 覆盖层接棒原生闪屏，呈现此刻真实天空
+     - 背景由 intro.js 用 sky.js 实时天色绘制（白天蓝天 / 深夜星海）
      - 减弱动态时跳过流星与闪烁，静态呈现并快速淡出
      - 真机：先收起原生闪屏(native)，用双 rAF 等其淡出首帧后再播 Web 开场；
        网页版：直接播放 Web 开场。兜底计时器保证绝不卡在启动画面 */
@@ -1197,9 +1210,14 @@
     }
     function startWeb() {
       el.classList.add('splash-run');
+      var phase = '';
+      try { phase = (getComputedStyle(document.documentElement).getPropertyValue('--phase-name') || '').trim(); } catch (e) {}
+      var env = buildSplashEnv();
       if (window.ShiNianIntro && canvas) {
         window.ShiNianIntro.start(canvas, {
           reduce: reduce,
+          phase: phase,
+          env: env,
           onDone: function () { setTimeout(end, 320); }   // 流星收尾后稍作停留再淡出
         });
       }
@@ -1225,6 +1243,49 @@
         startWeb();
       }
     } catch (e) { startWeb(); }
+  }
+
+  // v0.6.5：主天空云彩层（共享 ShiNianClouds 引擎，与开场同一片云）
+  function initSkyClouds() {
+    var cv = document.getElementById('cloudCanvas');
+    if (!cv || !window.ShiNianClouds) return;
+    var ctx = cv.getContext('2d');
+    if (!ctx) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var field = window.ShiNianClouds.create({ w: window.innerWidth, h: window.innerHeight });
+    field.setWeather();      // 按当前 data-weather 设定云量与浓度
+    var FPS = 30, step = 1000 / FPS, acc = 0, last = 0, raf = 0;
+    var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var w = window.innerWidth, h = window.innerHeight;
+      cv.width = Math.max(1, Math.round(w * dpr));
+      cv.height = Math.max(1, Math.round(h * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      field.resize(w, h);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    // 城市/天气变化 → 云量随之增减（阴/雨/雪增多，晴空减少）
+    window.addEventListener('cityChange', function () { field.setWeather(); });
+    function frame(ts) {
+      if (!last) last = ts;
+      var dt = (ts - last) / 1000; last = ts; acc += dt * 1000;
+      if (reduce) {
+        field.draw(ctx, ts, true);
+      } else {
+        var guard = 0;
+        while (acc >= step && guard < 3) { field.update(step / 1000); acc -= step; guard++; }
+        field.draw(ctx, ts, false);
+      }
+      raf = requestAnimationFrame(frame);
+    }
+    // 切后台暂停、回前台恢复（省电省流量）
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { if (raf) cancelAnimationFrame(raf); raf = 0; }
+      else if (!raf) { last = 0; acc = 0; raf = requestAnimationFrame(frame); }
+    });
+    raf = requestAnimationFrame(frame);
   }
 
   // 提醒模块折叠（v0.6.1 · 参考许愿池）：summary 显示开关状态，点击展开/收起，状态记住
@@ -1267,6 +1328,7 @@
     safe('initPerfMonitor', initPerfMonitor);
     safe('render', render);
     safe('initSplash', initSplash);       // 启动开场：Web 覆盖层接棒原生闪屏（无插件时仅淡出覆盖层）
+    safe('initSkyClouds', initSkyClouds); // 主天空云彩层（共享云引擎，与开场同一片云）
     // 许愿池不依赖城市数据，同步初始化（避免城市加载失败时永远不出现）
     safe('initWishes', initWishes);
     safe('renderWishes', renderWishes);

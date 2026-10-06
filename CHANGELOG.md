@@ -52,6 +52,7 @@
 | **v0.6.2** | 2026-10-06 | 天气温度自动刷新 | 设置新增「温度自动刷新」间隔（关闭 / 5 / 10 / 15 / 30 分钟，默认 5）；按间隔自动拉取实时温度（绕过 15 分钟缓存）；切后台暂停、回前台立即刷新；手动刷新保留；失败静默降级；附带 `?wrf=秒数` 调试钩子（不持久化） | tag v0.6.2 |
 | **v0.6.3** | 2026-10-06 | 审查修复（稳定性 / 安全 / 可访问性） | P0 自动刷新失败不再清空温度（保留上次有效温度）；P1 新增 CSP 纵深防御、键盘焦点环（WCAG 2.4.7）、自动刷新单测接入 npm test、部署清单补齐 5 个被引用 JS；P2 save() 容错对齐、关闭装饰即时停效果、cities.js 死引用清理 | tag v0.6.3 |
 | **v0.6.4** | 2026-10-06 | 启动开场动画重构 | 仅改开场动画（不动配色 / 字体 / 主界面 / decor.js）：新增 `assets/intro.js` canvas 分层辉光星场（亮星柔光晕 + 呼吸闪烁）替代随机小圆点；多颗带渐变拖尾与头部辉光的流星错峰划过替代单条 CSS 流星；`app.js` 原生→Web 接棒改用双 rAF 替代固定 320ms；canvas 2D 不可用时降级 no-op 仍收场；新增 `test_intro.js` 接入 npm test | tag v0.6.4 |
+| **v0.6.5** | 2026-10-06 | 云彩体系 + 开场联动真实天空 | 新增 `assets/clouds.js` 共享云引擎（柔边圆堆叠、随机大小/数量/形态、内置噪声漂移、时刻染色、天气联动）；开场 `intro.js` 改用 `sky.js` 实时天色绘制（白天蓝天/深夜星海），星点随昼夜隐显；主天空新增云层 canvas 共用同一引擎（「同一片天」）；开场文案新增相位副标题与城市·天气·温度环境微行；新增 `test_clouds.js` 接入 npm test | tag v0.6.5 |
 
 ### v0.6.4 明细（启动开场动画重构）
 
@@ -63,6 +64,16 @@
 - **降级守卫**：`intro.js` 在 `getContext` 返回 `null`（旧浏览器 / 无渲染环境）时降级为 no-op 仍回调 `onDone`；`prefers-reduced-motion` 下直绘静态星、跳过流星与闪烁。
 - **配套改动**：`index.html` 的 `#splash` 内 `<div class="splash-stars">` / `.splash-meteor` 替换为 `<canvas id="splashCanvas">`；`style.css` splash 段落移除旧星点/流星规则、新增 `.splash-canvas` 层；新增 `test_intro.js`（绘制不抛错 / 减弱动态快速收场 / 非减弱兜底触发 / 无 2D 上下文降级）接入 `npm test`。
 - **未触发 APK 构建**（用户暂不需要正式包）。
+
+### v0.6.5 明细（云彩体系 + 开场联动真实天空）
+
+- **共享云引擎 `assets/clouds.js`**：云 = 多个柔边圆（径向渐变）堆叠；随机基础半径、每次加载随机朵数、每云不同圆数堆出蓬松与细长形态；内置微型平滑噪声（无依赖）驱动轻微漂移，到边缘回卷；按时刻在 暗蓝灰(夜)→暖金(黎明/日落)→近白(白天) 间染色；`DPR` 钳制、`FPS` 限 ~30、`prefers-reduced-motion` 静态、无 2D 上下文跳过。
+- **天气联动**：读取现有 `:root[data-weather]`（clear/partly-cloudy/cloudy/fog/rain/snow/thunderstorm），阴/雾/雨/雪/雷 自动加云量与浓度，晴空减云——纯复用既有天气信号，零新接口。
+- **开场联动真实天空**：`#splash` 不再硬编码夜空；`intro.js` 用 `sky.js` 的 `--sky-top/--sky-bottom` 实时绘制此刻天色，星点透明度乘 `--stars-o`（白天自动隐星），白天不再划流星。
+- **主天空接入**：`.sky` 新增 `<canvas id="cloudCanvas">`，`app.js` `initSkyClouds` 绑定共享云引擎（独立 30fps 循环、`resize` 重建、`cityChange` 重算云量、`visibilitychange` 暂停），与主界面「同一片天」。
+- **开场文案**：`时念` / `ShiNian` / `欢迎来到时念` / 随时刻的相位副标题（读 `--phase-name`）/ 城市·天气·温度 环境微行（无数据时隐藏）。
+- **配套改动**：`index.html` 新增 `#cloudCanvas` 与 splash 文案节点；`style.css` 新增 `.cloud-canvas` 与 splash 文案样式；`push.py` 部署增补 `assets/clouds.js`；新增 `test_clouds.js`（create/reseed/draw/densityFromWeather/tintAt/update/降级）接入 `npm test`。
+- **未触发 APK 构建**（纯网页版，按用户一贯要求）。
 
 ### v0.6.1 明细
 

@@ -27,6 +27,7 @@
   </script>
   <script src="assets/notifications.js" defer></script>
   <script src="assets/decor.js" defer></script>
+  <script src="assets/clouds.js" defer></script>
   <script src="assets/intro.js" defer></script>
   <script src="assets/app.js" defer></script>
 </head>
@@ -36,7 +37,10 @@
     <canvas id="splashCanvas" class="splash-canvas" aria-hidden="true"></canvas>
     <div class="splash-card glass">
       <div class="splash-title">时念</div>
-      <div class="splash-sub">窗景正醒</div>
+      <div class="splash-en">ShiNian</div>
+      <div class="splash-welcome">欢迎来到时念</div>
+      <div class="splash-phase" id="splashPhase" hidden></div>
+      <div class="splash-env" id="splashEnv" hidden></div>
     </div>
   </div>
 
@@ -45,6 +49,7 @@
     <div class="orb orb-a"></div>
     <div class="orb orb-b"></div>
     <div class="stars" id="stars" aria-hidden="true"></div>
+    <canvas class="cloud-canvas" id="cloudCanvas" aria-hidden="true"></canvas>
     <canvas class="decor-canvas" id="decorCanvas" aria-hidden="true"></canvas>
   </div>
 

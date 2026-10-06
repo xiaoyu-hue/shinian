@@ -1,11 +1,23 @@
-/* 时念 · 开场引擎（v0.6.4）
-   - canvas 分层辉光星场：底层细星呼吸闪烁 + 少量亮星带柔光晕
-   - 多颗流星：渐变拖尾 + 头部辉光，错峰划过，沿用现有冷蓝白基调（不改动配色体系）
-   - DPR 钳制≤2、resize 重建、prefers-reduced-motion 直绘静态星无流星
+/* 时念 · 开场引擎（v0.6.5）
+   - 背景由 sky.js 的 --sky-top/--sky-bottom 实时绘制「此刻真实天色」（白天蓝天 / 深夜星海）
+   - 云：调用共享 ShiNianClouds 引擎（随机大小/数量/形态 + 噪声漂移 + 时刻染色）
+   - 星场：分层辉光星点，透明度乘 --stars-o（白天自动隐星）
+   - 多颗流星：渐变拖尾 + 头部辉光，错峰划过（白天不划，保持天色纯净）
+   - 文案：时念 / ShiNian / 欢迎来到时念 / 相位副标题 / 环境微行（由 app.js 传入）
+   - DPR 钳制≤2、resize 重建、prefers-reduced-motion 直绘静态（无流星、无漂移）
    - 无 2D 上下文（旧浏览器 / jsdom）时降级为 no-op，仍回调 onDone，保证开场不卡死
    - 仅服务 #splash 开场动画，不触碰主界面 / 装饰层 / 配色变量 */
 (function () {
   'use strict';
+
+  // 读取 :root 上的 CSS 变量（sky.js 写入的实时天色 / 星点透明度）；失败回退
+  function readVar(name, fallback) {
+    try {
+      var v = (getComputedStyle(document.documentElement).getPropertyValue(name) || '').trim();
+      return v || fallback;
+    } catch (e) { return fallback; }
+  }
+
   var ShiNianIntro = {
     _raf: 0,
     _ctx: null,
@@ -20,6 +32,13 @@
     _stopped: false,
     _onDone: null,
     _onResize: null,
+    _clouds: null,
+    _skyTop: '#04101c',
+    _skyBottom: '#0a2540',
+    _starsO: 1,
+    _phase: '',
+    _env: '',
+    _lastNow: 0,
 
     start: function (canvas, opts) {
       opts = opts || {};
@@ -35,21 +54,40 @@
       this._resize();
       this._build();
       var self = this;
-      this._onResize = function () { self._resize(); self._build(); };
+      this._onResize = function () { self._resize(); self._build(); if (self._clouds) self._clouds.resize(self._w, self._h); };
       window.addEventListener('resize', this._onResize);
+
+      // v0.6.5：消费 sky.js 真实天色 + 云引擎 + 文案
+      this._clouds = (typeof window.ShiNianClouds === 'object' && window.ShiNianClouds)
+        ? window.ShiNianClouds.create({ w: this._w, h: this._h }) : null;
+      this._skyTop = readVar('--sky-top', '#04101c');
+      this._skyBottom = readVar('--sky-bottom', '#0a2540');
+      var so = readVar('--stars-o', '1');
+      this._starsO = parseFloat(so);
+      if (isNaN(this._starsO)) this._starsO = 1;
+      this._phase = (typeof opts.phase === 'string') ? opts.phase : '';
+      this._env = (typeof opts.env === 'string') ? opts.env : '';
+      var phEl = document.getElementById('splashPhase');
+      if (phEl) { phEl.textContent = this._phase; phEl.hidden = !this._phase; }
+      var envEl = document.getElementById('splashEnv');
+      if (envEl) { envEl.textContent = this._env; envEl.hidden = !this._env; }
 
       this._t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
       if (this._reduce) {
-        this._draw();                 // 静态绘制一帧（无闪烁、无流星）
+        this._draw(0);                 // 静态绘制一帧（无闪烁、无流星、无漂移）
         setTimeout(function () { self._finish(); }, 260);
         return;
       }
 
-      // 错峰划过 3 颗流星，最后一颗收尾后收场
-      var delays = [360, 980, 1640];
-      delays.forEach(function (d, i) { setTimeout(function () { self._spawnMeteor(i); }, d); });
-      setTimeout(function () { self._finish(); }, 2700);
+      // 错峰划过流星（白天星点隐藏时不再划流星，保持真实天色纯净）
+      if (this._starsO > 0.1) {
+        var delays = [360, 980, 1640];
+        delays.forEach(function (d, i) { setTimeout(function () { self._spawnMeteor(i); }, d); });
+        setTimeout(function () { self._finish(); }, 2700);
+      } else {
+        setTimeout(function () { self._finish(); }, 1700);
+      }
 
       this._loop();
     },
@@ -106,20 +144,34 @@
 
     _frame: function () {
       if (this._stopped) return;
-      this._draw();
+      var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      var dt = this._lastNow ? Math.min(0.05, (now - this._lastNow) / 1000) : 0.016;
+      this._lastNow = now;
+      this._draw(dt);
       this._loop();
     },
 
-    _draw: function () {
+    _draw: function (dt) {
+      dt = dt || 0.016;
       var ctx = this._ctx, w = this._w, h = this._h;
       var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       var t = now - this._t0;
-      ctx.clearRect(0, 0, w, h);
+      // 实时天色背景（白天蓝天 / 深夜星海）——取代清屏，使开场即「此刻真实天空」
+      var g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, this._skyTop);
+      g.addColorStop(1, this._skyBottom);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+      // 云（共享 ShiNianClouds 引擎：随机大小/数量/形态 + 噪声漂移 + 时刻染色）
+      if (this._clouds) {
+        if (!this._reduce) this._clouds.update(dt);
+        this._clouds.draw(ctx, now, this._reduce);
+      }
 
       // 星场
       for (var i = 0; i < this._stars.length; i++) {
         var s = this._stars[i];
-        var tw = this._reduce ? 0.85 : (0.5 + 0.5 * Math.sin(t * 0.0022 * s.sp + s.ph));
+        var tw = (this._reduce ? 0.85 : (0.5 + 0.5 * Math.sin(t * 0.0022 * s.sp + s.ph))) * this._starsO;
         if (s.glow) {
           var g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4.5);
           g.addColorStop(0, 'rgba(228,242,255,' + (0.9 * tw).toFixed(3) + ')');

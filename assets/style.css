@@ -122,6 +122,8 @@ main {
 
 /* v0.5.5 季节彩蛋层：位于星空之上、内容之下（挂在 .sky 内，同属 z-index:-1 背景层） */
 .decor-canvas { position: absolute; inset: 0; pointer-events: none; }
+/* 云彩层（v0.6.5）：叠在星点之上、季节装饰之下，与主界面同属背景层 */
+.cloud-canvas { position: absolute; inset: 0; pointer-events: none; }
 
 /* ---- 玻璃 ---- */
 .glass {
@@ -744,13 +746,13 @@ input[type="date"] { color-scheme: dark; }
 }
 
 /* ============================================================
-   启动开场（v0.6.4）· 活的窗景 · canvas 星场 + 多流星
-   - 背景仍固定为品牌深夜渐变（配色体系未变），与主页形成明确「开幕」仪式感
-   - 星场与多颗流星由 intro.js 在 #splashCanvas 上渲染（分层辉光 + 渐变拖尾）
+   启动开场（v0.6.5）· 此刻真实天空 · canvas 实时天色 + 云 + 星场 + 多流星
+   - 背景由 intro.js 用 sky.js 的 --sky-top/--sky-bottom 实时绘制「此刻真实天色」
+     （白天蓝天白云无星、深夜星海），CSS 仅作 canvas 不可用时的兜底
+   - 云 / 星点 / 流星均由 intro.js 在 #splashCanvas 上渲染；星点透明度乘 --stars-o（白天自动隐星）
+   - 文案：时念 / ShiNian / 欢迎来到时念 / 相位副标题(随时刻) / 环境微行(城市·天气·温度)
    - 动画在 .splash-run 后触发，确保原生闪屏淡出后再完整播放
-     （修复 v0.6.0「原生与 Web 同时收起、Web 仅露脸 0.46s」的看不到问题）
-   - 三节拍：星场苏醒 → 流星引路 → 玻璃卡上浮
-   - 玻璃卡仍用 transform/opacity（GPU 合成）；星场/流星走 canvas
+   - 三节拍：天色苏醒 → 云飘入 + 星/流星引路 → 玻璃卡与欢迎上浮
    ============================================================ */
 #splash {
   position: fixed; inset: 0; z-index: 9999;
@@ -763,7 +765,7 @@ input[type="date"] { color-scheme: dark; }
 }
 #splash.gone { opacity: 0; }
 #splash.removed { display: none; }
-/* canvas 星场 + 多流星（v0.6.4 · 由 intro.js 渲染，沿用冷蓝白基调，不改动配色体系） */
+/* canvas 实时天色 + 云 + 星场 + 多流星（v0.6.5 · 由 intro.js 渲染，消费 sky.js 真实天色） */
 .splash-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
 
 /* 窗景浮起：玻璃卡从雾里上浮 */
@@ -773,8 +775,13 @@ input[type="date"] { color-scheme: dark; }
 }
 #splash.splash-run .splash-card { animation: splashRise .8s var(--ease-out) .2s forwards; }
 @keyframes splashRise { to { opacity: 1; transform: translateY(0); } }
-.splash-title { font-size: 34px; font-weight: 600; letter-spacing: .34em; color: var(--text); padding-left: .34em; }
-.splash-sub { margin-top: 10px; font-size: 12px; letter-spacing: .55em; color: var(--text-dim); padding-left: .55em; }
+.splash-title { font-size: 38px; font-weight: 600; letter-spacing: .34em; color: var(--text); padding-left: .34em;
+                text-shadow: 0 2px 24px rgba(0,0,0,.28); }
+.splash-en { margin-top: 8px; font-size: 13px; letter-spacing: .58em; color: var(--text-dim); padding-left: .58em; }
+.splash-welcome { margin-top: 18px; font-size: 15px; letter-spacing: .28em; color: var(--text); padding-left: .28em;
+                  font-weight: 500; }
+.splash-phase { margin-top: 12px; font-size: 12px; letter-spacing: .42em; color: var(--text-dim); padding-left: .42em; }
+.splash-env { margin-top: 6px; font-size: 12px; letter-spacing: .12em; color: var(--text-dim); opacity: .85; }
 
 /* 减弱动态：跳过流星与闪烁，静态呈现并快速淡出（星场由 intro.js 直绘静态星） */
 @media (prefers-reduced-motion: reduce) {
