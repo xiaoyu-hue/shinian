@@ -1,6 +1,6 @@
 # 时念 · ShiNian
 
-> 当前版本 **v0.5.9** · [版本历史与规范](./CHANGELOG.md) · [主站](https://shinian520.pages.dev/)
+> 当前版本 **v0.6.0** · [版本历史与规范](./CHANGELOG.md) · [主站](https://shinian520.pages.dev/)
 
 > 一款装在手机里的「活着的窗景」时间工具——天空随真实时刻、四季与天气流动，
 > 时钟、倒数日、提醒以液态玻璃卡片悬浮其上。**天空是主角，玻璃是舞台。**
@@ -11,7 +11,7 @@
 
 ---
 
-## ✨ 功能（v0.5.9 当前版本）
+## ✨ 功能（v0.6.0 当前版本）
 
 - **天空引擎 · 天文驱动**：黎明 / 清晨 / 正午 / 午后 / 日落 / 暮色 / 深夜，七时段色阶分钟级连续插值。锚点由**真实日出日落时间**动态计算——同一时刻，冬天和夏天看到的是不一样的天
 - **液态玻璃 UI**：玻璃配方随天空亮度自动切换（亮天空 → 磨砂白玻璃深色字；暗天空 → 深海玻璃浅色字），对比度全程满足 WCAG AA
@@ -27,6 +27,7 @@
 - **季节层**：春樱 / 夏青 / 秋琥珀 / 冬青灰 四套色调滤镜，以「四立」节气为切换点（非公历季度），切换前后 ±7 天平滑过渡
 - **季节彩蛋**：春樱飘落 / 夏夜萤火虫 / 秋黄叶飘落 / 冬夜极光，在对应季节随机浮现一次（可在设置的「天空装饰层」中关闭）
 - **常驻流星**：任何季节的夜晚，天空不时会划过流星（约 40–90 秒一颗）；常驻运行，但等待期间**零绘制、零耗电**
+- **启动画面与开场动画**（v0.6.0）：双层接棒、零新依赖——冷启动先用系统图标占位防白屏，Web 覆盖层随即接棒：天空从深蓝「苏醒」、一颗流星划过「引路」、玻璃卡从雾里「浮起」，与主界面同一片天、揭示零跳变；系统「减少动态」时自动跳过动画
 - **隐私**：不申请定位权限，不采集、不上传任何个人信息，数据只存在你的设备里
 
 ## 🚀 本地运行
@@ -76,6 +77,7 @@
 | [lunar-javascript](https://github.com/6tail/lunar-javascript) | 二十四节气 / 农历计算（v0.5 接入，季节切换点以「四立」节气为准） | MIT |
 | [@capacitor/android](https://capacitorjs.com) | 将网页封装为真实安卓 App（已集成，v0.6 真机化） | MIT |
 | [@capacitor/local-notifications](https://capacitorjs.com) | 本地通知（v0.4 接入，喝水 / 倒数日提醒） | MIT |
+| [@capacitor/splash-screen](https://capacitorjs.com) | 启动画面原生层（v0.6.0 接入，launchAutoHide:false + 深蓝背景，由 Web 开场覆盖层接棒） | MIT |
 
 **运行时零框架依赖**——不引入任何前端框架、不引入构建工具。v0.1 时期零网络请求；v0.2 起仅新增一个 Open-Meteo 天气请求（免密钥、不含任何个人信息），且失败时静默降级，不影响时钟与倒数日。
 
@@ -93,6 +95,7 @@
 | [noahziheng/starfield](https://github.com/noahziheng/starfield) | 随机流星的触发概率与最大并发数控制 |
 | [Fumi-no（Happiness Jar）](https://github.com/lauslim12/fumi-no) | 每日一条本地记录 + 自带备份恢复 + 隐私优先的理念，与许愿池「本地清单」定位一致 |
 | [wallwish 许愿墙](https://github.com/hiszm/wallwish) | CRUD + 事件委托 + 删除二次确认等工程细节 |
+| [Android SplashScreen API](https://developer.android.com/develop/ui/views/launch/splash-screen) | v0.6.0 启动画面「双层接棒」架构的第 0 层：系统免费提供的冷启动图标占位，避免白屏 |
 
 > **为什么自研而不直接引入**：本项目为**零构建**结构（无打包器，`index.html` 双击即用）；且这些库不会适配本仓库已有的降级钩子（`data-no-motion` / `data-low-perf` / `data-no-decor`）与「雨雪天气抑制飘落彩蛋」的天气层共存规则。
 
