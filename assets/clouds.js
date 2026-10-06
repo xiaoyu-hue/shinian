@@ -1,4 +1,5 @@
-/* 时念 · 云彩引擎 v2.1（v0.6.6 深度优化：真实云物理 + 移动/桌面分级）
+/* 时念 · 云彩引擎 v2.2（v0.6.6 深度优化：真实云物理 + 移动/桌面分级）
+   v0.6.8 热修：修复「云被渲染成纯黑」与「夜间云发暖棕」两个着色缺陷，详见下方【v0.6.8 修复】。
    ------------------------------------------------------------
    设计目标（对照真实云的逻辑）：
    1) 多层视差：高空卷云(快/薄/透) → 中层(中速/蓬松) → 低层(慢/宽/厚)，
@@ -79,12 +80,16 @@
   //   gold : 暖金色强度 0..1（低仰角晨昏最强，正午近 0）
   function sunInfo(hour) {
     var sr = 6.3, ss = 18.4;
-    var day = (hour - sr) / (ss - sr);            // 0 日出 .. 1 日落
-    day = Math.max(0, Math.min(1, day));
-    var x = 1 - 2 * day;                          // 日出(+1,东) → 日落(-1,西)
-    var elev = Math.sin(day * Math.PI);           // 0 两端, 1 正午
-    var gold = Math.pow(1 - elev, 1.6);           // 低仰角(晨昏)更暖
-    return { x: x, elev: elev, gold: gold };
+    var day = (hour - sr) / (ss - sr);            // 0 日出 .. 1 日落（夜间为负或 >1）
+    var above = (day >= 0 && day <= 1);           // 太阳是否在地平线之上
+    var dc = Math.max(0, Math.min(1, day));       // 仅用于方位插值
+    var x = 1 - 2 * dc;                           // 日出(+1,东) → 日落(-1,西)
+    // 修复（v0.6.8）：此前 day 被钳制后再算仰角，导致深更半夜被当成 day=0/1，
+    // 仰角≈0 → gold=1（最强暖金），午夜的云被涂上 golden hour 暖光成暖棕色。
+    // 现在太阳在地平线下时：仰角 0、暖金 0（无阳光），由 draw() 改为均匀冷暗。
+    var elev = above ? Math.sin(dc * Math.PI) : 0;  // 0 两端, 1 正午
+    var gold = above ? Math.pow(1 - elev, 1.6) : 0; // 低仰角(晨昏)更暖；夜间无
+    return { x: x, elev: elev, gold: gold, above: above };
   }
 
   // ---- 天气 → 云型/亮度/浓度/覆盖（沿用既有 data-weather 信号）----
@@ -263,9 +268,14 @@
     this._hour = nowHour();
     var sun = sunInfo(this._hour);
     var baseTint = tintAt(this._hour);
+    // 修复（v0.6.8）：tintAt 返回 {r,g,b,a} 对象，而 shade/warm/mix 期望 [r,g,b] 数组。
+    // 此前直接把对象传给 shade() 会取到 undefined → NaN → 被 clamp255 强转为 0，
+    // 导致所有云被渲染成 rgba(0,0,0,α) 纯黑（即「大黑乌云」的根因）。
+    // 这里显式拆出 [r,g,b] 供着色计算，透明度仍用 baseTint.a。
+    var bt = [baseTint.r, baseTint.g, baseTint.b];
     var h = this.h, w = this.w;
     var p = this._profile;
-    var sh = shade(baseTint, -0.16);                 // 背光暗部基准（轻压暗，避免成片发黑）
+    var sh = shade(bt, -0.16);                 // 背光暗部基准（轻压暗，避免成片发黑）
     for (var i = 0; i < this.clouds.length; i++) {
       var c = this.clouds[i];
       var cy = c.yFrac * h;
@@ -277,9 +287,11 @@
         var b = c.blobs[j];
         // 光照：迎光面更亮、顶部更亮、晨昏暖染
         var sideNorm = Math.max(-1, Math.min(1, (b.dx) * sun.x / (c.baseR * 1.5)));
-        var lit = 0.5 + 0.5 * sideNorm;                       // 0(背)..1(迎)
+        // 修复（v0.6.8）：夜间太阳在地平线下，无方向光，云体应均匀受环境光，
+        // 而非保留「一侧亮一侧暗」的日间光照逻辑（否则夜云一侧发暖发亮）。
+        var lit = sun.above ? (0.5 + 0.5 * sideNorm) : 0.5;   // 0(背)..1(迎)；夜间恒定 0.5
         var top = b.dy < 0 ? 1 : 0;
-        var hi = shade(baseTint, 0.14 + 0.12 * top);
+        var hi = shade(bt, 0.14 + 0.12 * top);
         hi = warm(hi, sun.gold * lit * 0.55);                 // golden hour 暖轮廓
         var col = mix(sh, hi, lit);
         col = [col[0] * p.bright, col[1] * p.bright, col[2] * p.bright];
