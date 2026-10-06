@@ -455,7 +455,14 @@ main {
 :root[data-no-motion] .wish-star { display: none; }
 
 /* ---- v0.5.7 提醒模块（主页面 · 倒数日下方，从设置面板下放） ---- */
-.remind-card { padding: 14px 16px; }
+.remind-card { padding: 12px 16px; }
+/* v0.6.1 提醒折叠（参考许愿池） */
+.remind-summary { display: flex; align-items: center; justify-content: space-between;
+  width: 100%; min-height: 44px; padding: 0; border: 0; background: none;
+  color: var(--text-dim); font: 14px/1 inherit; font-family: inherit; cursor: pointer; }
+.remind-chevron { transition: transform .2s; color: var(--text-faint); }
+.remind-summary[aria-expanded="true"] .remind-chevron { transform: rotate(180deg); }
+.remind-body { margin-top: 10px; }
 .remind-hint { margin: 0 0 12px; font-size: 12px; line-height: 1.6;
                color: var(--text-faint); }
 .remind-block + .remind-block { margin-top: 14px; padding-top: 12px;
@@ -709,18 +716,21 @@ input[type="date"] { color-scheme: dark; }
 }
 
 /* ============================================================
-   启动开场（v0.6）· 活的窗景
-   - 背景直接消费 sky.js 写入 :root 的 --sky-top/--sky-bottom，
-     与主界面同一片天，揭示时零跳变（无需单独抽天空函数）
-   - 三节拍：天空苏醒(veil) → 流星引路(meteor) → 窗景浮起(card)
-   - 仅用 transform/opacity（GPU 合成），不动触发重排的属性
+   启动开场（v0.6.1）· 活的窗景 · 固定品牌夜空
+   - 背景固定为品牌深夜渐变（不复用实时天空），与主页形成明确「开幕」仪式感
+   - 动画仅在 .splash-run 后触发，确保原生闪屏淡出后再完整播放
+     （修复 v0.6.0「原生与 Web 同时收起、Web 仅露脸 0.46s」的看不到问题）
+   - 三节拍：星点呼吸 → 流星引路 → 玻璃卡上浮
+   - 仅用 transform/opacity（GPU 合成）
    ============================================================ */
 #splash {
   position: fixed; inset: 0; z-index: 9999;
   display: flex; align-items: center; justify-content: center;
   pointer-events: none; overflow: hidden;
-  background: linear-gradient(178deg, var(--sky-top, #030d18) 0%, var(--sky-bottom, #0a3050) 100%);
-  transition: opacity .42s var(--ease-out);
+  background:
+    radial-gradient(130% 90% at 50% -15%, rgba(130,170,230,.22), transparent 60%),
+    linear-gradient(180deg, #020a14 0%, #06182e 55%, #0a2540 100%);
+  transition: opacity .5s var(--ease-out);
 }
 #splash.gone { opacity: 0; }
 #splash.removed { display: none; }
@@ -728,46 +738,40 @@ input[type="date"] { color-scheme: dark; }
 .splash-stars { position: absolute; inset: 0; }
 .splash-stars i {
   position: absolute; width: 2px; height: 2px; border-radius: 50%;
-  background: rgba(222,236,255,.85); opacity: 0;
-  animation: splashTwinkle 2.4s ease-in-out infinite;
+  background: rgba(222,236,255,.9); opacity: .55;
 }
-@keyframes splashTwinkle { 0%, 100% { opacity: .15; } 50% { opacity: .9; } }
+#splash.splash-run .splash-stars i { animation: splashTwinkle 2.6s ease-in-out infinite; }
+@keyframes splashTwinkle { 0%, 100% { opacity: .2; } 50% { opacity: .95; } }
 
-/* 流星引路：一次性划过，收尾 opacity:0 自动消失，不进常驻逻辑 */
+/* 流星引路：清晰可见的拖尾，深色背景上醒目（v0.6.1 加粗加亮修复不可见问题） */
 .splash-meteor {
-  position: absolute; top: 18%; left: -12%;
-  width: 150px; height: 2px; border-radius: 2px;
-  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.95) 100%);
-  box-shadow: 0 0 9px rgba(200,225,255,.85);
-  opacity: 0; transform: rotate(18deg);
-  animation: splashMeteor .65s var(--ease-out) .5s 1 forwards;
+  position: absolute; top: 22%; left: -18%;
+  width: 230px; height: 3px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(170,210,255,.9) 72%, #ffffff 100%);
+  box-shadow: 0 0 16px 3px rgba(150,200,255,.85);
+  opacity: 0;
+}
+#splash.splash-run .splash-meteor {
+  animation: splashMeteor .85s var(--ease-out) .35s 1 forwards;
 }
 @keyframes splashMeteor {
-  0%   { opacity: 0; transform: translate(0, 0) rotate(18deg); }
-  12%  { opacity: 1; }
-  100% { opacity: 0; transform: translate(125vw, 42vh) rotate(18deg); }
+  0%   { opacity: 0; transform: translate(0, 0) rotate(20deg); }
+  10%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(130vw, 47vh) rotate(20deg); }
 }
-
-/* 天空苏醒：深蓝面纱淡出，露出真实时刻天空 */
-.splash-veil {
-  position: absolute; inset: 0; background: #030d18; opacity: 1;
-  animation: splashWake .7s var(--ease-out) forwards;
-}
-@keyframes splashWake { to { opacity: 0; } }
 
 /* 窗景浮起：玻璃卡从雾里上浮 */
 .splash-card {
-  position: relative; z-index: 2; padding: 22px 36px; border-radius: var(--radius);
-  text-align: center; opacity: 0; transform: translateY(14px);
-  animation: splashRise .7s var(--ease-out) .9s forwards;
+  position: relative; z-index: 2; padding: 26px 44px; border-radius: var(--radius);
+  text-align: center; opacity: 0; transform: translateY(18px);
 }
+#splash.splash-run .splash-card { animation: splashRise .8s var(--ease-out) .2s forwards; }
 @keyframes splashRise { to { opacity: 1; transform: translateY(0); } }
-.splash-title { font-size: 30px; font-weight: 600; letter-spacing: .32em; color: var(--text); padding-left: .32em; }
-.splash-sub { margin-top: 8px; font-size: 12px; letter-spacing: .5em; color: var(--text-dim); padding-left: .5em; }
+.splash-title { font-size: 34px; font-weight: 600; letter-spacing: .34em; color: var(--text); padding-left: .34em; }
+.splash-sub { margin-top: 10px; font-size: 12px; letter-spacing: .55em; color: var(--text-dim); padding-left: .55em; }
 
 /* 减弱动态：跳过三节拍，静态呈现并快速淡出 */
 @media (prefers-reduced-motion: reduce) {
   #splash .splash-meteor { display: none; }
-  #splash .splash-veil { opacity: 0; animation: none; }
   #splash .splash-card { opacity: 1; transform: none; animation: none; }
 }

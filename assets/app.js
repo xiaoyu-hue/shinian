@@ -9,6 +9,28 @@
   var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 
   // ============================================================
+  // 全局容错（v0.6.1）：任何运行时错误都只记录、不白屏
+  // 单条初始化失败不影响其余功能，最差情况也能看到时钟与倒数日
+  // ============================================================
+  function safe(label, fn) {
+    try { fn(); } catch (e) { if (window.console) console.warn('[时念] ' + label + ' 初始化失败（已跳过）:', e); }
+  }
+  window.addEventListener('error', function (e) {
+    if (window.console) console.warn('[时念] 运行时错误（已兜底）:', e && e.message);
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    if (window.console) console.warn('[时念] 异步未处理拒绝（已兜底）:', e && e.reason);
+  });
+  // 启动兜底网：无论 boot 是否抛错，3.5s 后强制移除开场层，绝不卡在启动画面
+  setTimeout(function () {
+    var s = document.getElementById('splash');
+    if (s && !s.classList.contains('removed')) {
+      s.classList.add('gone');
+      setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 520);
+    }
+  }, 3500);
+
+  // ============================================================
   // 动效工具：全部基于原生 Web Animations API，零依赖
   // 统一尊重系统「减弱动态效果」设置，老浏览器静默跳过
   // ============================================================
@@ -694,6 +716,7 @@
   var settings = {
     recipe: 'auto', motion: true, decor: true,
     wishCollapsed: true,          // v0.5.9 许愿池默认折叠；用户可自定义并记住
+    remindCollapsed: true,        // v0.6.1 提醒模块默认折叠；用户可自定义并记住
     remind: { water: false, waterIntervalH: 2, quietStart: 22, quietEnd: 8,
               cd: false, cdTime: '08:00', cdLeadTime: '20:00',
               wishRemind: true, wishTime: '09:00' }   // v0.5.9 许愿池到期提醒（默认开，用户可关）
@@ -707,6 +730,7 @@
         if (typeof s.motion === 'boolean') settings.motion = s.motion;
         if (typeof s.decor === 'boolean') settings.decor = s.decor;
         if (typeof s.wishCollapsed === 'boolean') settings.wishCollapsed = s.wishCollapsed;
+        if (typeof s.remindCollapsed === 'boolean') settings.remindCollapsed = s.remindCollapsed;
         if (s.remind && typeof s.remind === 'object') {
           var r = s.remind;
           if (typeof r.water === 'boolean') settings.remind.water = r.water;
@@ -881,6 +905,7 @@
       el.addEventListener('click', function () {
         settings.remind[key] = !settings.remind[key];
         saveSettings(); applySettings(); haptic(8);
+        updateRemindSummary();
         if (settings.remind[key] && window.ShiNianRemind && !window.ShiNianRemind.isAvailable()) {
           hint('本地提醒需安装 App（安卓 APK）才会弹出系统通知；网页版已保存设置但不弹通知。');
         }
@@ -1087,59 +1112,106 @@
     if (!el) return;
     var box = document.getElementById('splashStars');
     if (box) {
-      var n = window.innerWidth >= 680 ? 70 : 36;
+      var n = window.innerWidth >= 680 ? 70 : 38;
       for (var i = 0; i < n; i++) {
         var s = document.createElement('i');
         s.style.left = (Math.random() * 100) + '%';
         s.style.top = (Math.random() * 64) + '%';
-        s.style.animationDelay = (Math.random() * 2.2).toFixed(2) + 's';
+        s.style.animationDelay = (Math.random() * 2.4).toFixed(2) + 's';
         box.appendChild(s);
       }
     }
     var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    var MIN = reduce ? 220 : 1700;   // 动画总时长 / 减弱动态时极短呈现
-    var MAX = 2600;                  // 安全上限，防卡死
+    var MIN = reduce ? 320 : 1500;   // 三节拍总时长（含停留）；减弱动态时极短呈现
+    var MAX = 2400;                  // 安全上限，防卡死
     var ended = false;
     function end() {
       if (ended) return; ended = true;
-      var SP = window.SplashScreen ||
-               (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen);
-      if (SP && typeof SP.hide === 'function') { try { SP.hide(); } catch (e) {} }
       el.classList.add('gone');
       setTimeout(function () {
         el.classList.add('removed');
         if (el.parentNode) el.parentNode.removeChild(el);
-      }, 460);
+      }, 520);
     }
-    setTimeout(end, MIN);
-    setTimeout(end, MAX);            // 兜底
+    // 原生闪屏（Capacitor 插件）存在时：先收起它，待其淡出后再触发 Web 开场，
+    // 避免 v0.6.0「原生与 Web 同时收起、Web 仅露脸 0.46s」的看不到问题
+    function reveal() {
+      el.classList.add('splash-run');
+      setTimeout(end, MIN);
+      setTimeout(end, MAX);
+    }
+    var SP = window.SplashScreen ||
+             (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen);
+    try {
+      if (SP && typeof SP.hide === 'function') {
+        SP.hide();
+        setTimeout(reveal, 320);     // 等原生层淡出后再播放 Web 开场
+      } else {
+        reveal();
+      }
+    } catch (e) { reveal(); }
+  }
+
+  // 提醒模块折叠（v0.6.1 · 参考许愿池）：summary 显示开关状态，点击展开/收起，状态记住
+  function updateRemindSummary() {
+    var text = document.getElementById('remindSummaryText');
+    if (!text) return;
+    var onCount = 0;
+    if (settings.remind.water) onCount++;
+    if (settings.remind.cd) onCount++;
+    if (settings.remind.wishRemind) onCount++;
+    var collapsed = settings.remindCollapsed !== false;
+    text.textContent = '提醒 · 已开启 ' + onCount + ' 项 · ' + (collapsed ? '轻点展开' : '轻点收起');
+  }
+  function initRemind() {
+    var summary = document.getElementById('remindSummary');
+    var body = document.getElementById('remindBody');
+    var collapsed = settings.remindCollapsed !== false;
+    function applyCollapsed() {
+      if (body) body.hidden = collapsed;
+      if (summary) summary.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      updateRemindSummary();
+    }
+    if (summary) {
+      summary.addEventListener('click', function () {
+        collapsed = !collapsed;
+        settings.remindCollapsed = collapsed;
+        saveSettings();
+        applyCollapsed();
+        haptic(6);
+      });
+    }
+    applyCollapsed();
   }
 
   function boot() {
-    loadSettings();          // 先恢复设置，再渲染，避免动效闪烁
-    tickClock();
+    safe('loadSettings', loadSettings);   // 先恢复设置，再渲染，避免动效闪烁
+    safe('tickClock', tickClock);
     setInterval(tickClock, 1000);
-    initForm();
-    initPerfMonitor();
-    render();
-    initSplash();           // 启动开场：Web 覆盖层接棒原生闪屏（无插件时仅淡出覆盖层）
+    safe('initForm', initForm);
+    safe('initPerfMonitor', initPerfMonitor);
+    safe('render', render);
+    safe('initSplash', initSplash);       // 启动开场：Web 覆盖层接棒原生闪屏（无插件时仅淡出覆盖层）
     // 许愿池不依赖城市数据，同步初始化（避免城市加载失败时永远不出现）
-    initWishes();
-    renderWishes();
+    safe('initWishes', initWishes);
+    safe('renderWishes', renderWishes);
+    safe('initRemind', initRemind);
     // 网络恢复后自动重试天气（PLAN v0.2 · Phase 4 断网降级链路）
     window.addEventListener('online', function () {
       if (currentCity) refreshWeather();
     });
-    // 城市数据与天气异步启动，不阻塞主界面
+    // 城市数据与天气异步启动，不阻塞主界面（失败仅缺天气，不影响其余）
     loadCities().then(function() {
-      initCityPicker();
-      initSettings();
-      initWeatherEffects();
-      // 启动时拉取天气
+      safe('initCityPicker', initCityPicker);
+      safe('initSettings', initSettings);
+      safe('initWeatherEffects', initWeatherEffects);
+      // 启动时拉取天气（失败静默降级，不弹错）
       ShiNianWeather.fetch(currentCity).then(function(data){
         updateWeatherDisplay(data);
         window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: currentCity, weather: data}}));
-      });
+      }).catch(function () { if (window.console) console.warn('[时念] 天气拉取失败（降级）'); });
+    }).catch(function () {
+      if (window.console) console.warn('[时念] 城市数据加载失败（使用默认城市）');
     });
   }
 

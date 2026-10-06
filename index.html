@@ -24,10 +24,8 @@
 <body>
   <!-- 启动开场（v0.6）：活的窗景 · 天空苏醒 → 流星引路 → 窗景浮起 -->
   <div id="splash" aria-hidden="true">
-    <div class="splash-sky"></div>
     <div class="splash-stars" id="splashStars"></div>
     <div class="splash-meteor"></div>
-    <div class="splash-veil"></div>
     <div class="splash-card glass">
       <div class="splash-title">时念</div>
       <div class="splash-sub">窗景正醒</div>
@@ -191,45 +189,53 @@
       <h2 class="section-title">提醒</h2>
 
       <div class="glass card remind-card">
-        <p class="remind-hint" id="remindHint">系统通知需安装安卓 App 才会弹出；网页版仅保存设置。</p>
+        <button type="button" class="remind-summary" id="remindSummary"
+                aria-expanded="false" aria-controls="remindBody">
+          <span id="remindSummaryText">提醒 · 轻点展开设置</span>
+          <span class="remind-chevron" aria-hidden="true">▾</span>
+        </button>
 
-        <div class="remind-block">
-          <label class="set-row" for="remindToggle">
-            <span>喝水提醒</span>
-            <button type="button" class="set-toggle" id="remindToggle"
-                    role="switch" aria-checked="false" aria-label="喝水提醒"></button>
-          </label>
-          <div class="remind-fields" id="waterFields">
-            <label class="set-row">
-              <span>每隔（小时）</span>
-              <input type="number" id="remindInterval" class="set-input narrow"
-                     min="0.5" max="12" step="0.5" value="2">
+        <div class="remind-body" id="remindBody" hidden>
+          <p class="remind-hint" id="remindHint">系统通知需安装安卓 App 才会弹出；网页版仅保存设置。</p>
+
+          <div class="remind-block">
+            <label class="set-row" for="remindToggle">
+              <span>喝水提醒</span>
+              <button type="button" class="set-toggle" id="remindToggle"
+                      role="switch" aria-checked="false" aria-label="喝水提醒"></button>
             </label>
-            <label class="set-row">
-              <span>安静时段（停止—开始）</span>
-              <span class="set-input-group">
-                <input type="number" id="remindQuietStart" class="set-input narrow" min="0" max="23" value="22">–
-                <input type="number" id="remindQuietEnd" class="set-input narrow" min="0" max="23" value="8">
-              </span>
-            </label>
+            <div class="remind-fields" id="waterFields">
+              <label class="set-row">
+                <span>每隔（小时）</span>
+                <input type="number" id="remindInterval" class="set-input narrow"
+                       min="0.5" max="12" step="0.5" value="2">
+              </label>
+              <label class="set-row">
+                <span>安静时段（停止—开始）</span>
+                <span class="set-input-group">
+                  <input type="number" id="remindQuietStart" class="set-input narrow" min="0" max="23" value="22">–
+                  <input type="number" id="remindQuietEnd" class="set-input narrow" min="0" max="23" value="8">
+                </span>
+              </label>
+            </div>
           </div>
-        </div>
 
-        <div class="remind-block">
-          <label class="set-row" for="cdRemindToggle">
-            <span>倒数日提醒</span>
-            <button type="button" class="set-toggle" id="cdRemindToggle"
-                    role="switch" aria-checked="false" aria-label="倒数日提醒"></button>
-          </label>
-          <div class="remind-fields" id="cdFields">
-            <label class="set-row">
-              <span>提前一天（提醒「明天是…」）</span>
-              <input type="time" id="cdLeadTime" class="set-input" value="20:00">
+          <div class="remind-block">
+            <label class="set-row" for="cdRemindToggle">
+              <span>倒数日提醒</span>
+              <button type="button" class="set-toggle" id="cdRemindToggle"
+                      role="switch" aria-checked="false" aria-label="倒数日提醒"></button>
             </label>
-            <label class="set-row">
-              <span>当天（提醒「今天是…」）</span>
-              <input type="time" id="cdRemindTime" class="set-input" value="08:00">
-            </label>
+            <div class="remind-fields" id="cdFields">
+              <label class="set-row">
+                <span>提前一天（提醒「明天是…」）</span>
+                <input type="time" id="cdLeadTime" class="set-input" value="20:00">
+              </label>
+              <label class="set-row">
+                <span>当天（提醒「今天是…」）</span>
+                <input type="time" id="cdRemindTime" class="set-input" value="08:00">
+              </label>
+            </div>
           </div>
         </div>
       </div>
