@@ -115,6 +115,35 @@
         </div>
 
         <div class="set-block">
+          <label class="set-row" for="cloudToggle">
+            <span>云彩</span>
+            <button type="button" class="set-toggle on" id="cloudToggle"
+                    role="switch" aria-checked="true" aria-label="云彩"></button>
+          </label>
+          <div class="remind-fields" id="cloudFields">
+            <label class="set-row">
+              <span>云量</span>
+              <select id="cloudAmount" class="set-input set-select">
+                <option value="auto">跟随天气</option>
+                <option value="sparse">疏</option>
+                <option value="normal">适中</option>
+                <option value="dense">密</option>
+              </select>
+            </label>
+            <label class="set-row">
+              <span>空窗期</span>
+              <select id="cloudGap" class="set-input set-select">
+                <option value="off">连续有云</option>
+                <option value="short">短（约 15 秒）</option>
+                <option value="mid">中（约 30 秒）</option>
+                <option value="long">长（约 50 秒）</option>
+              </select>
+            </label>
+            <p class="set-note">空窗期＝云飘过后留一段澄澈天空，再迎来下一批云。「连续有云」则云不中断。</p>
+          </div>
+        </div>
+
+        <div class="set-block">
           <div class="set-label">天气</div>
           <label class="set-row" for="weatherRefreshMin">
             <span>温度自动刷新</span>

@@ -147,14 +147,35 @@
     return { count: Math.round(p.coverage * 10), alpha: p.alpha };
   }
 
+  // v0.7.1：云彩自定义开关与云量档位（读 :root[data-cloud]，由设置面板写入）
+  //   off=关闭（不画云，天空纯净）/ auto=跟随天气（默认）/ sparse=疏 / normal=适中 / dense=密
+  var CLOUD_MODE = { off: { mul: 0 }, auto: { mul: 1.00 }, sparse: { mul: 0.45 },
+                     normal: { mul: 0.80 }, dense: { mul: 1.60 } };
+  function cloudMode() {
+    var v = (typeof document !== 'undefined')
+      ? document.documentElement.getAttribute('data-cloud') : null;
+    var m = CLOUD_MODE[v];
+    return m || CLOUD_MODE.auto;
+  }
+
+  // v0.7.1 空窗期：云飘过之后留一段澄澈天空，再让下一批云回来（真实天空的节奏）
+  //   off=连续有云(无空窗) / short≈14s / mid≈28s / long≈50s
+  var CLOUD_GAP = { off: 0, short: 14, mid: 28, long: 50 };
+  function cloudGapSec() {
+    var v = (typeof document !== 'undefined')
+      ? document.documentElement.getAttribute('data-cloud-gap') : null;
+    var g = CLOUD_GAP[v];
+    return (typeof g === 'number') ? g : 0;
+  }
+
   // ---------- 云层（远 → 近；远的慢、近的快，形成视差纵深）----------
   var LAYER_CFG = {
     high: { band: [0.02, 0.32], cols: 5, rows: 2, rx: [0.12, 0.24], ry: [0.028, 0.055],
-            speed: 0.0026, alpha: 0.40, haze: 0.62, erode: 0.62, thr: 0.52 },
+            speed: 0.0062, alpha: 0.40, haze: 0.62, erode: 0.62, thr: 0.52 },
     mid:  { band: [0.08, 0.55], cols: 4, rows: 2, rx: [0.15, 0.28], ry: [0.060, 0.110],
-            speed: 0.0055, alpha: 0.74, haze: 0.30, erode: 0.52, thr: 0.46 },
+            speed: 0.0135, alpha: 0.74, haze: 0.30, erode: 0.52, thr: 0.46 },
     low:  { band: [0.32, 0.88], cols: 3, rows: 2, rx: [0.20, 0.36], ry: [0.090, 0.160],
-            speed: 0.0105, alpha: 0.96, haze: 0.10, erode: 0.46, thr: 0.44 }
+            speed: 0.0245, alpha: 0.96, haze: 0.10, erode: 0.46, thr: 0.44 }
   };
   var LAYER_ORDER = ['high', 'mid', 'low'];   // 由远及近绘制
 
@@ -214,6 +235,11 @@
     this._hour = nowHour();
     this._seed = (Math.random() * 100000) | 0;
     this.clouds = [];
+    // v0.7.1 空窗节律：有云 runSec 秒 → 空窗 gapSec 秒，循环；切换处 4 秒淡入淡出
+    this._gapT = 0;
+    this._runSec = 55 + Math.random() * 45;      // 每轮有云时长（55~100s，随机避免机械感）
+    this._gapSec = 0;
+    this._fade = 1;
     this._alloc();
     this.reseed();
   }
@@ -235,7 +261,8 @@
     for (var li = 0; li < layers.length; li++) {
       var id = layers[li], L = LAYER_CFG[id];
       var kind = pickKind(id, p);
-      var cov = p.coverage * (id === 'low' ? 1.0 : 0.82);
+      var cm = cloudMode();
+      var cov = p.coverage * (id === 'low' ? 1.0 : 0.82) * cm.mul;
       var band = (p.hug && id === 'low') ? [0.60, 0.99] : L.band;
       var cols = (p.hug && id === 'low') ? 4 : L.cols;   // 雾：更密的贴地宽带
       for (var r = 0; r < L.rows; r++) {
@@ -278,11 +305,29 @@
 
   Field.prototype.update = function (dt) {
     this._t += dt;                                  // 湍流时间项 → 云持续变形
+    // v0.7.1 空窗节律推进
+    this._gapSec = cloudGapSec();
+    if (this._gapSec > 0) {
+      this._gapT += dt;
+      var cycle = this._runSec + this._gapSec;
+      var p = this._gapT % cycle;
+      if (p < this._runSec) {
+        var fi = Math.min(1, p / 4);                       // 入场淡入
+        var fo = Math.min(1, (this._runSec - p) / 4);      // 离场淡出
+        this._fade = Math.max(0, Math.min(fi, fo));
+      } else {
+        this._fade = 0;                                    // 空窗期：完全无云
+      }
+    } else {
+      this._fade = 1;                                      // 关闭空窗 → 连续有云
+    }
     for (var i = 0; i < this.clouds.length; i++) {
       var c = this.clouds[i];
       c.x += c.speed * dt;                          // 风场平流
-      if (c.x - c.rx > 1.18) {                      // 出右界 → 左界回卷并换形态
-        c.x = -0.18 - c.rx - Math.random() * 0.15;
+      // v0.7.1：出右界后紧贴左界外回卷（此前放到 -0.18 之外，慢层需 1~2 分钟才重新入场，
+      // 造成「一段时期天空空着没云」）。现在仅离屏 0.02~0.10，配合提速，空窗降到几秒。
+      if (c.x - c.rx > 1.02) {
+        c.x = -c.rx - 0.02 - Math.random() * 0.08;
         c.y = c.band[0] + Math.random() * (c.band[1] - c.band[0]);
         c.seed = (Math.random() * 1000) | 0;
       }
@@ -291,6 +336,10 @@
 
   Field.prototype.render = function (reduced) {
     var buf = this.buf; buf.fill(0);
+    // v0.6.8+：云彩关闭时直接清空（调用方仍需 draw 以把清空的画布贴上去）
+    if (cloudMode().mul === 0) return;
+    // v0.7.1：空窗期内无云 —— 直接返回，连光栅化都跳过（省电）；淡入淡出由 _fade 控制
+    if (this._fade <= 0.001) return;
     this._hour = nowHour();
     var sun = sunState(this._hour);
     var tint = tintAt(this._hour);
@@ -370,7 +419,7 @@
         if (cl.haze > 0) col = mix3(col, bt, cl.haze * 0.55);   // 远层雾化
         col = [col[0] * bright, col[1] * bright, col[2] * bright];
 
-        var alpha = a * baseA;
+        var alpha = a * baseA * this._fade;      // 乘空窗淡入淡出系数
         if (alpha <= 0.004) continue;
         // 源覆盖合成（由远及近）
         var idx = (y * fw + x) * 4;
@@ -400,17 +449,18 @@
     } catch (e) { return false; }
   };
   Field.prototype.draw = function (ctx, nowMs, reduced) {
-    this.render(!!reduced);
+    this.render(!!reduced);                 // 像素始终计算（供测试读取），与能否贴图无关
     if (!ctx) return;
-    if (!this._ensureOff()) return;
-    this._img.data.set(this.buf);
-    this._offCtx.putImageData(this._img, 0, 0);
+    // 环境若不支持离屏 canvas 或 createImageData（如 jsdom 测试桩）→ 优雅降级不贴图
+    if (!this._ensureOff() || !this._img) return;
     try {
+      this._img.data.set(this.buf);
+      this._offCtx.putImageData(this._img, 0, 0);
       var prev = ctx.imageSmoothingEnabled;
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(this._off, 0, 0, this.w, this.h);
       ctx.imageSmoothingEnabled = prev;
-    } catch (e) { /* 目标上下文不支持 drawImage（如极简测试桩）→ 静默跳过 */ }
+    } catch (e) { /* 目标上下文不支持 drawImage/putImageData → 静默跳过 */ }
   };
   // 供测试读取真实像素（不依赖 canvas）
   Field.prototype.pixels = function () { return this.buf; };
@@ -421,6 +471,7 @@
     tintAt: tintAt,
     densityFromWeather: densityFromWeather,
     weatherProfile: weatherProfile,
+    cloudMode: cloudMode,
     config: function (opts) { return detectQuality(opts); },
     fireAmount: fireAmount,
     shapeAt: shapeAt,

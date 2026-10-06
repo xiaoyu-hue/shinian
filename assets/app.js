@@ -760,6 +760,8 @@
   var SET_KEY = 'shinian.settings.v1';
   var settings = {
     recipe: 'auto', motion: true, decor: true,
+    clouds: true, cloudAmount: 'auto',   // v0.7.1 云彩开关与云量档位（auto=跟随天气）
+    cloudGap: 'mid',                     // v0.7.1 空窗期：off=连续有云 / short / mid / long
     wishCollapsed: true,          // v0.5.9 许愿池默认折叠；用户可自定义并记住
     remindCollapsed: true,        // v0.6.1 提醒模块默认折叠；用户可自定义并记住
     weatherRefreshMin: 5,         // v0.6.2 温度自动刷新间隔（分钟）：0=关闭，可选 5/10/15/30
@@ -775,6 +777,14 @@
         if (s.recipe === 'auto' || s.recipe === 'light' || s.recipe === 'dark') settings.recipe = s.recipe;
         if (typeof s.motion === 'boolean') settings.motion = s.motion;
         if (typeof s.decor === 'boolean') settings.decor = s.decor;
+        // v0.7.1 云彩开关与云量档位
+        if (typeof s.clouds === 'boolean') settings.clouds = s.clouds;
+        if (['auto', 'sparse', 'normal', 'dense'].indexOf(s.cloudAmount) !== -1) {
+          settings.cloudAmount = s.cloudAmount;
+        }
+        if (['off', 'short', 'mid', 'long'].indexOf(s.cloudGap) !== -1) {
+          settings.cloudGap = s.cloudGap;
+        }
         if (typeof s.wishCollapsed === 'boolean') settings.wishCollapsed = s.wishCollapsed;
         if (typeof s.remindCollapsed === 'boolean') settings.remindCollapsed = s.remindCollapsed;
         if (s.remind && typeof s.remind === 'object') {
@@ -809,6 +819,9 @@
     else root.setAttribute('data-no-motion', '');
     if (settings.decor) root.removeAttribute('data-no-decor');
     else root.setAttribute('data-no-decor', '');
+    // v0.7.1 云彩：关闭 → data-cloud=off（云引擎清空）；开启 → 云量档位
+    root.setAttribute('data-cloud', settings.clouds ? settings.cloudAmount : 'off');
+    root.setAttribute('data-cloud-gap', settings.clouds ? settings.cloudGap : 'off');
     window.dispatchEvent(new CustomEvent('recipeChange'));   // 天空引擎立即重算
     // v0.6.3 · P2：装饰层开关改变时，让运行中的季节彩蛋/流星立即生效或停止。
     // 原仅设置 data-no-decor 属性，已触发的动画要等自身时长结束才停（最长 40s）；
@@ -839,8 +852,12 @@
     });
     var mt = document.getElementById('motionToggle');
     if (mt) { mt.classList.toggle('on', settings.motion); mt.setAttribute('aria-checked', String(settings.motion)); }
-    var dt = document.getElementById('decorToggle');
-    if (dt) { dt.classList.toggle('on', settings.decor); dt.setAttribute('aria-checked', String(settings.decor)); }
+    var dt2 = document.getElementById('cloudToggle');
+    if (dt2) { dt2.classList.toggle('on', settings.clouds); dt2.setAttribute('aria-checked', String(settings.clouds)); }
+    var ca = document.getElementById('cloudAmount');
+    if (ca) { ca.value = settings.cloudAmount; ca.disabled = !settings.clouds; }
+    var cg = document.getElementById('cloudGap');
+    if (cg) { cg.value = settings.cloudGap; cg.disabled = !settings.clouds; }
     var c = document.getElementById('itemCount');
     if (c) c.textContent = load().length;
 
@@ -958,6 +975,24 @@
     }
     bindToggle('motionToggle', 'motion');
     bindToggle('decorToggle', 'decor');
+    // v0.7.1 云彩开关：切换后需让云场重新播种（数量/云型随档位变化）
+    bindToggle('cloudToggle', 'clouds');
+    var ct2 = document.getElementById('cloudToggle');
+    if (ct2) ct2.addEventListener('click', function () {
+      window.dispatchEvent(new CustomEvent('cloudModeChange'));
+    });
+    var caSel = document.getElementById('cloudAmount');
+    function onCloudOptChange(sel, key, allowed) {
+      if (!sel) return;
+      sel.addEventListener('change', function () {
+        if (allowed.indexOf(sel.value) === -1) return;
+        settings[key] = sel.value;
+        saveSettings(); applySettings(); haptic(8);
+        window.dispatchEvent(new CustomEvent('cloudModeChange'));
+      });
+    }
+    onCloudOptChange(caSel, 'cloudAmount', ['auto', 'sparse', 'normal', 'dense']);
+    onCloudOptChange(document.getElementById('cloudGap'), 'cloudGap', ['off', 'short', 'mid', 'long']);
 
     // 本地提醒
     function bindRemindToggle(id, key) {
@@ -1286,6 +1321,12 @@
         window.ShiNianSunMoon.setCity(c.lat, c.lon);
       }
     });
+    // v0.7.1：云彩开关/云量档位变化 → 重新播种云场
+    window.addEventListener('cloudModeChange', function () {
+      clearedOff = false;
+      field.setWeather();
+    });
+    var clearedOff = false;
     function frame(ts) {
       if (!last) last = ts;
       var dt = (ts - last) / 1000; last = ts; acc += dt * 1000;
@@ -1293,6 +1334,17 @@
         smCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
         window.ShiNianSunMoon.draw(smCtx, window.innerWidth, window.innerHeight);
       }
+      // v0.7.1：云彩关闭 → 清空一次后跳过绘制与更新（省电）
+      var cm = window.ShiNianClouds.cloudMode ? window.ShiNianClouds.cloudMode() : null;
+      if (cm && cm.mul === 0) {
+        if (!clearedOff) {
+          ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+          clearedOff = true;
+        }
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      clearedOff = false;
       if (reduce) {
         field.draw(ctx, ts, true);
       } else {
