@@ -4,12 +4,12 @@
 
 | 元信息 | 内容 |
 |---|---|
-| 文档版本 | v0.5.7（与当前交付对齐） |
-| 状态 | ✅ v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4 已交付 |
+| 文档版本 | v0.5.9（与当前交付对齐） |
+| 状态 | ✅ v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4 / v0.5.5 / v0.5.6 / v0.5.7 / v0.5.9 已交付 |
 | 作者 | xiaoyu-hue |
 | 创建日期 | 2026-10-04 |
-| 最后更新 | 2026-10-05 |
-| 交付版本 | [v0.4.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.4.0) · [主站](https://shinian520.pages.dev/) · [备用副站](https://xiaoyu-hue.github.io/shinian/) |
+| 最后更新 | 2026-10-06 |
+| 交付版本 | [v0.4.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.4.0) · [v0.5.9](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.5.9) · [主站](https://shinian520.pages.dev/) · [备用副站](https://xiaoyu-hue.github.io/shinian/) |
 | 关联文档 | [PLAN.md](./PLAN.md)、[PLAN-v0.2.md](./PLAN-v0.2.md)、[CHANGELOG.md](../CHANGELOG.md)（版本规范与历史）、主站 `docs/DESIGN_CONTRACT.md`（视觉令牌体系的源头） |
 
 ---
@@ -125,6 +125,7 @@
 | v0.5.5 | 季节彩蛋：春樱飘落 / 夏夜萤火虫 / 秋黄叶飘落 / 冬夜极光（随机触发） | 无（自研 canvas） | ✅ 已完成 |
 | v0.5.6 | 常驻彩蛋：流星（四季夜间通用，40–90 秒一颗） | 无（自研 canvas） | ✅ 已完成 |
 | v0.5.7 | 提醒模块重构：下放主页面 + 提前一天提醒 | @capacitor/local-notifications | ✅ 已完成 |
+| v0.5.9 | 许愿池：备忘录式清单 + 开放氛围合并 | 无（自研） | ✅ 已完成 |
 | v0.6 | 真机化：Capacitor 封装、图标与启动画面、CI 打包 APK、Releases 分发、手机安装实测 | Capacitor + GitHub Actions | 进行中（APK 构建链路已搭建，见 `.github/workflows/build-apk.yml`） |
 
 > 注：2026-10-05 起，原 v0.3「提醒能力」与新增的「设置与数据」对调——后者为新的一级模块且数据安全优先，详见 [CHANGELOG](../CHANGELOG.md) 路线图注释。
@@ -175,3 +176,5 @@
 | 2026-10-05 | v0.3 交付 | 新增设置与数据模块：玻璃配方手动锁定、微交互 / 天气装饰开关、念想备份（复制文本 / 下载 JSON）、导入恢复（合并去重）、二次确认清空。发布 [v0.3.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.3.0)；路线图自本版起重排（原 v0.3 提醒能力顺延至 v0.4） |
 | 2026-10-05 | 文档 | 新增 [CHANGELOG.md](../CHANGELOG.md)，确立版本命名规则、判定原则与发布流程 |
 | 2026-10-05 | v0.4 交付 | 本地提醒能力：喝水间隔提醒（活跃窗口计算式排程 + 安静时段跳过）、倒数日「今天」提醒；接入 `@capacitor/local-notifications` v7，网页端优雅降级。发布 [v0.4.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.4.0) |
+| 2026-10-05 | v0.5.5 / v0.5.6 / v0.5.7 交付 | 季节彩蛋（春樱 / 夏萤 / 秋叶 / 冬极光）、常驻流星、提醒模块重构（下放主页面 + 提前一天提醒）；分别发布对应 tag |
+| 2026-10-06 | v0.5.9 交付 | 许愿池（备忘录式清单 + 开放氛围合并）：独立数据层、备份整合、微交互、流星联动、到期提醒；修复 initWishes 启动。发布 [v0.5.9](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.5.9) |
