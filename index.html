@@ -98,6 +98,21 @@
         </div>
 
         <div class="set-block">
+          <div class="set-label">天气</div>
+          <label class="set-row" for="weatherRefreshMin">
+            <span>温度自动刷新</span>
+            <select id="weatherRefreshMin" class="set-input set-select">
+              <option value="0">关闭</option>
+              <option value="5">每 5 分钟</option>
+              <option value="10">每 10 分钟</option>
+              <option value="15">每 15 分钟</option>
+              <option value="30">每 30 分钟</option>
+            </select>
+          </label>
+          <p class="set-note">实时温度按所选间隔自动更新；切到后台自动暂停，回到前台立即刷新一次。</p>
+        </div>
+
+        <div class="set-block">
           <div class="set-label">数据 · 共 <span id="itemCount">0</span> 条念想</div>
           <div class="set-actions">
             <button type="button" class="set-btn" id="exportCopy">复制备份文本</button>

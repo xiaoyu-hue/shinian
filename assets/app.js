@@ -708,6 +708,38 @@
     });
   }
 
+  // ---- 天气温度自动刷新（v0.6.2）----
+  // 自动任务绕过 15 分钟缓存（refresh 已清缓存），只更新数据、不碰刷新按钮；
+  // 手动刷新仍走 refreshWeather（带按钮转圈反馈）。失败静默降级，不影响时钟与倒数日。
+  var weatherTimer = null;
+  function autoRefreshWeather() {
+    if (!currentCity) return;
+    ShiNianWeather.refresh(currentCity).then(function (data) {
+      updateWeatherDisplay(data);
+      window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: currentCity, weather: data}}));
+    }).catch(function () {
+      if (window.console) console.warn('[时念] 自动刷新天气失败（降级）');
+    });
+  }
+  function stopWeatherAutoRefresh() {
+    if (weatherTimer) { clearInterval(weatherTimer); weatherTimer = null; }
+  }
+  function startWeatherAutoRefresh() {
+    stopWeatherAutoRefresh();
+    var min = settings.weatherRefreshMin;
+    if (!min) return;   // 0 = 关闭自动刷新
+    var ms = min * 60000;
+    // 调试钩子（不持久化，遵循项目 ?t=/?season= 约定）：?wrf=秒数 临时缩短间隔便于验收
+    try {
+      var q = new URLSearchParams(location.search).get('wrf');
+      if (q && /^\d+$/.test(q) && +q > 0) ms = Math.min(600000, +q * 1000);
+    } catch (e) {}
+    weatherTimer = setInterval(function () {
+      if (document.hidden) return;   // 后台期间双保险：即便漏过 visibility 事件也不刷
+      autoRefreshWeather();
+    }, ms);
+  }
+
   // ============================================================
   // 设置与数据
   // 设置持久化在 localStorage['shinian.settings.v1']
@@ -717,6 +749,7 @@
     recipe: 'auto', motion: true, decor: true,
     wishCollapsed: true,          // v0.5.9 许愿池默认折叠；用户可自定义并记住
     remindCollapsed: true,        // v0.6.1 提醒模块默认折叠；用户可自定义并记住
+    weatherRefreshMin: 5,         // v0.6.2 温度自动刷新间隔（分钟）：0=关闭，可选 5/10/15/30
     remind: { water: false, waterIntervalH: 2, quietStart: 22, quietEnd: 8,
               cd: false, cdTime: '08:00', cdLeadTime: '20:00',
               wishRemind: true, wishTime: '09:00' }   // v0.5.9 许愿池到期提醒（默认开，用户可关）
@@ -742,6 +775,11 @@
           if (typeof r.cdLeadTime === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(r.cdLeadTime)) settings.remind.cdLeadTime = r.cdLeadTime;
           if (typeof r.wishRemind === 'boolean') settings.remind.wishRemind = r.wishRemind;
           if (typeof r.wishTime === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(r.wishTime)) settings.remind.wishTime = r.wishTime;
+        }
+        // v0.6.2 天气自动刷新间隔：只允许 0/5/10/15/30，其余视为无效回退默认 5
+        if (s.weatherRefreshMin !== undefined) {
+          var wm = +s.weatherRefreshMin;
+          if ([0, 5, 10, 15, 30].indexOf(wm) !== -1) settings.weatherRefreshMin = wm;
         }
       }
     } catch (e) {}
@@ -805,6 +843,10 @@
     if (wrt) { wrt.classList.toggle('on', settings.remind.wishRemind); wrt.setAttribute('aria-checked', String(settings.remind.wishRemind)); }
     var wtm = document.getElementById('wishTime');
     if (wtm) wtm.value = settings.remind.wishTime;
+
+    // v0.6.2 天气自动刷新间隔下拉同步
+    var wrm = document.getElementById('weatherRefreshMin');
+    if (wrm) wrm.value = String(settings.weatherRefreshMin);
 
     // 网页端（无原生桥）显示提示；App 内可用则隐藏
     var rh = document.getElementById('remindHint');
@@ -931,6 +973,17 @@
     bindRemindInput('wishTime', 'wishTime', function (v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v) ? v : null; });
     bindRemindInput('cdRemindTime', 'cdTime', function (v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v) ? v : null; });
     bindRemindInput('cdLeadTime', 'cdLeadTime', function (v) { return /^([01]?\d|2[0-3]):[0-5]\d$/.test(v) ? v : null; });
+
+    // v0.6.2 温度自动刷新间隔（下拉）：关闭 / 5 / 10 / 15 / 30 分钟，改完立即按新间隔重启
+    var wrm = document.getElementById('weatherRefreshMin');
+    if (wrm) wrm.addEventListener('change', function () {
+      var v = parseInt(wrm.value, 10);
+      if ([0, 5, 10, 15, 30].indexOf(v) === -1) { wrm.value = String(settings.weatherRefreshMin); return; }
+      settings.weatherRefreshMin = v;
+      saveSettings();
+      startWeatherAutoRefresh();
+      haptic(6);
+    });
 
     // 导出 · 复制文本
     document.getElementById('exportCopy').addEventListener('click', function () {
@@ -1199,6 +1252,16 @@
     // 网络恢复后自动重试天气（PLAN v0.2 · Phase 4 断网降级链路）
     window.addEventListener('online', function () {
       if (currentCity) refreshWeather();
+    });
+    // 天气温度自动刷新（v0.6.2）：按设置间隔自动拉取；切后台暂停、回前台立即刷、静默降级
+    startWeatherAutoRefresh();
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        stopWeatherAutoRefresh();        // 后台暂停：省电省流量
+      } else {
+        autoRefreshWeather();            // 回前台立即刷新一次（绕过 15 分钟缓存）
+        startWeatherAutoRefresh();       // 按当前设置重启定时器
+      }
     });
     // 城市数据与天气异步启动，不阻塞主界面（失败仅缺天气，不影响其余）
     loadCities().then(function() {
