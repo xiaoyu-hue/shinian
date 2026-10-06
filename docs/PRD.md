@@ -4,12 +4,12 @@
 
 | 元信息 | 内容 |
 |---|---|
-| 文档版本 | v0.5.9（与当前交付对齐） |
-| 状态 | ✅ v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4 / v0.5.5 / v0.5.6 / v0.5.7 / v0.5.9 已交付 |
+| 文档版本 | v0.6.0（与当前交付对齐） |
+| 状态 | ✅ v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4 / v0.5.5 / v0.5.6 / v0.5.7 / v0.5.9 / v0.6.0（启动画面）已交付；v0.6 其余子项（手机安装实测、通知重启恢复）进行中 |
 | 作者 | xiaoyu-hue |
 | 创建日期 | 2026-10-04 |
 | 最后更新 | 2026-10-06 |
-| 交付版本 | [v0.4.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.4.0) · [v0.5.9](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.5.9) · [主站](https://shinian520.pages.dev/) · [备用副站](https://xiaoyu-hue.github.io/shinian/) |
+| 交付版本 | [v0.4.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.4.0) · [v0.5.9](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.5.9) · [v0.6.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.0) · [主站](https://shinian520.pages.dev/) · [备用副站](https://xiaoyu-hue.github.io/shinian/) |
 | 关联文档 | [PLAN.md](./PLAN.md)、[PLAN-v0.2.md](./PLAN-v0.2.md)、[CHANGELOG.md](../CHANGELOG.md)（版本规范与历史）、主站 `docs/DESIGN_CONTRACT.md`（视觉令牌体系的源头） |
 
 ---
@@ -126,7 +126,8 @@
 | v0.5.6 | 常驻彩蛋：流星（四季夜间通用，40–90 秒一颗） | 无（自研 canvas） | ✅ 已完成 |
 | v0.5.7 | 提醒模块重构：下放主页面 + 提前一天提醒 | @capacitor/local-notifications | ✅ 已完成 |
 | v0.5.9 | 许愿池：备忘录式清单 + 开放氛围合并 | 无（自研） | ✅ 已完成 |
-| v0.6 | 真机化：Capacitor 封装、图标与启动画面、CI 打包 APK、Releases 分发、手机安装实测 | Capacitor + GitHub Actions | 进行中（APK 构建链路已搭建，见 `.github/workflows/build-apk.yml`） |
+| v0.6.0 | 启动画面与开场动画：双层接棒、零新依赖（Web 覆盖层复用 sky.js 天空变量 + 原生 @capacitor/splash-screen 深蓝占位） | Capacitor + GitHub Actions | ✅ 已完成（v0.6 子集） |
+| v0.6 | 真机化剩余：手机安装实测、通知重启恢复（BOOT_COMPLETED） | Capacitor + GitHub Actions | 进行中 |
 
 > 注：2026-10-05 起，原 v0.3「提醒能力」与新增的「设置与数据」对调——后者为新的一级模块且数据安全优先，详见 [CHANGELOG](../CHANGELOG.md) 路线图注释。
 
@@ -178,3 +179,4 @@
 | 2026-10-05 | v0.4 交付 | 本地提醒能力：喝水间隔提醒（活跃窗口计算式排程 + 安静时段跳过）、倒数日「今天」提醒；接入 `@capacitor/local-notifications` v7，网页端优雅降级。发布 [v0.4.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.4.0) |
 | 2026-10-05 | v0.5.5 / v0.5.6 / v0.5.7 交付 | 季节彩蛋（春樱 / 夏萤 / 秋叶 / 冬极光）、常驻流星、提醒模块重构（下放主页面 + 提前一天提醒）；分别发布对应 tag |
 | 2026-10-06 | v0.5.9 交付 | 许愿池（备忘录式清单 + 开放氛围合并）：独立数据层、备份整合、微交互、流星联动、到期提醒；修复 initWishes 启动。发布 [v0.5.9](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.5.9) |
+| 2026-10-06 | v0.6.0 交付 | 启动画面与开场动画（活的窗景）：双层接棒、零新依赖——Web 覆盖层复用 sky.js 天空变量（与主界面同一片天、揭示零跳变）+ 三节拍动画（天空苏醒 → 流星引路 → 窗景浮起）+ 原生 @capacitor/splash-screen 深蓝占位；尊重 prefers-reduced-motion。发布 [v0.6.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.0) |
