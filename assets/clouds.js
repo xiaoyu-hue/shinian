@@ -89,19 +89,19 @@
 
   // ---- 天气 → 云型/亮度/浓度/覆盖（沿用既有 data-weather 信号）----
   var WEATHER = {
-    clear:         { count: 0.50, alpha: 0.78, type: 'cumulus',     bright: 1.00, coverage: 0.35 },
-    'partly-cloudy':{ count: 1.00, alpha: 1.00, type: 'cumulus',     bright: 1.00, coverage: 0.60 },
-    cloudy:        { count: 1.50, alpha: 1.12, type: 'stratus',      bright: 0.90, coverage: 0.85 },
-    fog:           { count: 1.35, alpha: 0.95, type: 'stratus-low',  bright: 1.05, coverage: 0.90, hug: true },
-    drizzle:       { count: 1.70, alpha: 1.25, type: 'storm',        bright: 0.66, coverage: 0.90 },
-    rain:          { count: 1.75, alpha: 1.28, type: 'storm',        bright: 0.58, coverage: 0.92 },
-    snow:          { count: 1.60, alpha: 1.18, type: 'storm',        bright: 0.82, coverage: 0.88, cool: true },
-    thunderstorm:  { count: 1.95, alpha: 1.32, type: 'storm',        bright: 0.48, coverage: 0.95 }
+    clear:         { count: 0.42, alpha: 0.70, type: 'cumulus',     bright: 1.00, coverage: 0.30 },
+    'partly-cloudy':{ count: 0.70, alpha: 0.85, type: 'cumulus',     bright: 1.00, coverage: 0.50 },
+    cloudy:        { count: 0.88, alpha: 0.88, type: 'stratus',      bright: 0.96, coverage: 0.65 },
+    fog:           { count: 0.80, alpha: 0.80, type: 'stratus-low',  bright: 1.05, coverage: 0.75, hug: true },
+    drizzle:       { count: 0.92, alpha: 0.95, type: 'storm',        bright: 0.86, coverage: 0.70 },
+    rain:          { count: 0.95, alpha: 0.95, type: 'storm',        bright: 0.84, coverage: 0.72 },
+    snow:          { count: 0.88, alpha: 0.88, type: 'storm',        bright: 0.94, coverage: 0.68, cool: true },
+    thunderstorm:  { count: 0.98, alpha: 0.92, type: 'storm',        bright: 0.82, coverage: 0.75 }
   };
   function weatherProfile() {
     var w = (typeof document !== 'undefined')
       ? document.documentElement.getAttribute('data-weather') : null;
-    return WEATHER[w] || { count: 0.90, alpha: 0.95, type: 'cumulus', bright: 0.98, coverage: 0.55 };
+    return WEATHER[w] || { count: 0.72, alpha: 0.88, type: 'cumulus', bright: 0.98, coverage: 0.55 };
   }
   function densityFromWeather() {            // 保留旧接口（兼容性 / 单测）
     var p = weatherProfile();
@@ -109,8 +109,8 @@
   }
 
   // ---- 设备分级（移动 / 桌面）----
-  var DESKTOP = { dpr: 2,   resScale: 1.00, fps: 30, baseCount: 7, blobsMin: 8, blobsMax: 14, layers: ['high', 'mid', 'low'] };
-  var MOBILE  = { dpr: 1.5, resScale: 0.62, fps: 24, baseCount: 4, blobsMin: 5, blobsMax: 9,  layers: ['mid', 'low'] };
+  var DESKTOP = { dpr: 2,   resScale: 1.00, fps: 30, baseCount: 5, blobsMin: 7, blobsMax: 12, layers: ['high', 'mid', 'low'] };
+  var MOBILE  = { dpr: 1.5, resScale: 0.62, fps: 24, baseCount: 3, blobsMin: 4, blobsMax: 8,  layers: ['mid', 'low'] };
   function detectQuality(opts) {
     opts = opts || {};
     if (opts.quality === 'desktop') return DESKTOP;
@@ -129,8 +129,8 @@
   // ---- 云层参数（视差：speed 越大越快；alpha 越大越靠前不透）----
   var LAYERS = {
     high: { yTop: 0.04, yBot: 0.22, scale: 0.7, speed: [14, 22], alpha: 0.50 },
-    mid:  { yTop: 0.12, yBot: 0.52, scale: 1.0, speed: [6, 12],  alpha: 0.82 },
-    low:  { yTop: 0.34, yBot: 0.80, scale: 1.3, speed: [2.5, 5.5], alpha: 1.0 }
+    mid:  { yTop: 0.12, yBot: 0.52, scale: 1.0, speed: [6, 12],  alpha: 0.78 },
+    low:  { yTop: 0.34, yBot: 0.80, scale: 1.3, speed: [2.5, 5.5], alpha: 0.95 }
   };
 
   // ---- 颜色工具 ----
@@ -193,10 +193,9 @@
 
   Field.prototype._makeCloud = function (layer, kind, p, q) {
     var L = LAYERS[layer];
-    var baseR = (layer === 'high' ? 60 : layer === 'low' ? 95 : 72) * L.scale * (0.8 + Math.random() * 0.5);
-    if (p.hug && layer === 'low') baseR *= 1.3;        // 雾：贴地更宽
+    var baseR = (layer === 'high' ? 46 : layer === 'low' ? 68 : 54) * L.scale * (0.8 + Math.random() * 0.5);
+    if (p.hug && layer === 'low') baseR *= 1.15;       // 雾：贴地略宽
     var nb = q.blobsMin + Math.floor(Math.random() * (q.blobsMax - q.blobsMin + 1));
-    if (kind === 'storm') nb += 3;                      // 风暴更密
     if (kind === 'cirrus') nb = Math.max(5, Math.round(nb * 0.5));
     var blobs = [];
     var rnd = Math.random;
@@ -204,9 +203,9 @@
       var sheetH = baseR * 0.5;
       for (var s = 0; s < nb; s++) {
         blobs.push({
-          dx: (rnd() - 0.5) * baseR * 3.6,
+          dx: (rnd() - 0.5) * baseR * 2.5,
           dy: (rnd() - 0.5) * sheetH,
-          r: baseR * (0.28 + rnd() * 0.32),
+          r: baseR * (0.22 + rnd() * 0.26),
           sx: 1.5 + rnd() * 0.9, sy: 0.62          // 横向铺开、压扁
         });
       }
@@ -223,11 +222,11 @@
       var baseLine = baseR * 0.26;
       for (var k = 0; k < nb; k++) {
         var ang = rnd() * Math.PI * 2;
-        var rad = rnd() * baseR * 0.9;
+        var rad = rnd() * baseR * 0.66;
         var dx = Math.cos(ang) * rad;
-        var dy = baseLine - rnd() * baseR * (kind === 'storm' ? 1.3 : 1.05);
+        var dy = baseLine - rnd() * baseR * (kind === 'storm' ? 1.2 : 0.95);
         if (rnd() < 0.25) dy = baseLine + rnd() * baseR * 0.15;   // 少量落于底边 → 平基底
-        blobs.push({ dx: dx, dy: dy, r: baseR * (0.40 + rnd() * 0.5) });
+        blobs.push({ dx: dx, dy: dy, r: baseR * (0.34 + rnd() * 0.42) });
       }
     }
     var yTop = (p.hug && layer === 'low') ? 0.74 : L.yTop;
@@ -266,7 +265,7 @@
     var baseTint = tintAt(this._hour);
     var h = this.h, w = this.w;
     var p = this._profile;
-    var sh = shade(baseTint, -0.30);                 // 背光暗部基准
+    var sh = shade(baseTint, -0.16);                 // 背光暗部基准（轻压暗，避免成片发黑）
     for (var i = 0; i < this.clouds.length; i++) {
       var c = this.clouds[i];
       var cy = c.yFrac * h;
@@ -284,7 +283,7 @@
         hi = warm(hi, sun.gold * lit * 0.55);                 // golden hour 暖轮廓
         var col = mix(sh, hi, lit);
         col = [col[0] * p.bright, col[1] * p.bright, col[2] * p.bright];
-        var a = baseA * (0.6 + 0.4 * lit);
+        var a = baseA * (0.42 + 0.32 * lit);          // 单 blob 更通透
         ctx.save();
         ctx.translate(c.x + nx + b.dx, cy + ny + b.dy);
         ctx.scale(b.sx || 1, (b.sy || 1) * baseSy);
