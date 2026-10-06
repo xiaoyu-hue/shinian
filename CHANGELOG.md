@@ -50,6 +50,7 @@
 | **v0.6.0** | 2026-10-06 | 启动画面与开场动画 | 双层接棒架构、零新运行时依赖：Web 开场覆盖层直接复用 sky.js 写入 :root 的天空变量（与主界面同一片天、揭示零跳变）；三节拍动画（天空苏醒 → 流星引路 → 窗景浮起）；无缝接棒（先收起原生闪屏再淡出覆盖层）；尊重 prefers-reduced-motion；原生层加 @capacitor/splash-screen（launchAutoHide:false + 深蓝背景） | 17665eb |
 | **v0.6.1** | 2026-10-06 | 启动画面修复 + 容错加固 + 提醒折叠 | 修复 v0.6.0「开场仅闪现 0.46s 感知不到」的时序 bug（改固定品牌深夜天空 + `.splash-run` 闸门让原生淡出后完整播放）；流星加粗加亮；全局错误捕获 + `safe()` 包裹初始化 + 3.5s 启动兜底网；城市/天气失败静默降级；提醒模块折叠（参考许愿池，默认折叠、显示已开启 N 项）；构建支持正式签名（Secrets 驱动，未配置降级 debug） | c970c92 |
 | **v0.6.2** | 2026-10-06 | 天气温度自动刷新 | 设置新增「温度自动刷新」间隔（关闭 / 5 / 10 / 15 / 30 分钟，默认 5）；按间隔自动拉取实时温度（绕过 15 分钟缓存）；切后台暂停、回前台立即刷新；手动刷新保留；失败静默降级；附带 `?wrf=秒数` 调试钩子（不持久化） | tag v0.6.2 |
+| **v0.6.3** | 2026-10-06 | 审查修复（稳定性 / 安全 / 可访问性） | P0 自动刷新失败不再清空温度（保留上次有效温度）；P1 新增 CSP 纵深防御、键盘焦点环（WCAG 2.4.7）、自动刷新单测接入 npm test、部署清单补齐 5 个被引用 JS；P2 save() 容错对齐、关闭装饰即时停效果、cities.js 死引用清理 | tag v0.6.3 |
 
 ### v0.6.1 明细
 
@@ -91,6 +92,34 @@
 
 **验证**
 - `node --check` 通过；真机 / 网页实测：改短间隔后 Network 面板每 N 分钟出现一次 open-meteo 请求、温度变化自动反映；切后台定时器暂停、回前台立即刷新（留待用户实测确认）
+
+### v0.6.3 明细（审查修复：稳定性 / 安全 / 可访问性）
+
+**P0 · 稳定性（自动刷新不再清空温度）**
+- 根因：v0.6.2 的 `autoRefreshWeather()` 在 Open-Meteo 超时返回 `null` 时仍调用 `updateWeatherDisplay(null)`，命中「隐藏天气行」分支，把上次有效的温度清空——移动端偶发慢网会周期性「温度闪没」
+- 修复：自动刷新分支仅在 `data` 非空时更新显示；失败/超时保留上一次有效温度（静默降级，仅 `console.warn`）。手动刷新仍保留原「失败即隐藏 + 提示重试」语义
+
+**P1 · 安全（CSP 纵深防御）**
+- `index.html` `<head>` 新增 Content-Security-Policy meta：`default-src 'self'`、`connect-src` 仅放行 `https://api.open-meteo.com`、`script-src 'self' 'unsafe-inline'`（兼容 head 内「条件注入本地通知插件」的内联脚本）
+- 本项目 XSS 风险本就极低（全部动态文本走 `textContent`），CSP 为额外加固层；若未来去除内联脚本可进一步收紧为 nonce/hash
+
+**P1 · 可访问性（键盘焦点环）**
+- `.btn` / `.cd-edit` / `.cd-del` / `.set-toggle` / `.wish-check` / `.set-btn` / `.city-btn` / `.refresh-btn` / `.settings-btn` / `.wish-summary` / `.remind-summary` 补 `:focus-visible` 焦点环（2px 实色 + 偏移），满足 WCAG 2.4.7；此前 `.city-btn` 等用 `:focus{outline:none}` 却未提供替代指示
+
+**P1 · 测试（自动刷新单测接入）**
+- 新增 `test_autorefresh.js`：覆盖「失败不清空温度」「成功更新」「间隔可配置（关闭=不启动定时器）」「`?wrf=秒数` 调试钩子覆盖间隔」四项
+- 根 `package.json` 的 `test` 脚本改为 `node test_wish.js && node test_notif_s5.js && node test_autorefresh.js`；`app.js` 暴露 `window.ShiNianApp` 测试钩子（不影响运行时）
+
+**P1 · 部署清单（消除隐性断链）**
+- `push.py` 的 `FILES` 补齐被引用但未部署的 5 个 JS：`weather.js` / `sky.js` / `season.js` / `lunar.js` / `cities.js`（此前靠早期推送留存，改这些文件不会被重新部署）；`assets/plugins/local-notifications.js` 仅 APK 构建链注入，不纳入网页清单
+
+**P2 · 容错与清理**
+- `save()` 加 `try/catch`，与 `saveWishes()` 对齐（localStorage 写满/隐私模式禁用时不抛错）；`render()` 对 `#cdList` 容器缺失判空（跨天调用兜底）
+- 关闭「天空装饰层」时通过 `ShiNianDecor.setEnabled()` 立即停季节彩蛋/流星（原仅设属性，已触发的动画要等自身时长结束才停，最长 40s）
+- `cities.js` 删除指向 `data/cities.json` / `tools/gen-cities.js` 等不存在路径的死引用注释
+
+**验证**
+- `node --check` 通过；`npm test` 三套测试全绿（含 v0.6.3 新增的自动刷新四项断言）
 
 ### v0.6.0 明细
 

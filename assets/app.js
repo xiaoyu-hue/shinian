@@ -107,7 +107,8 @@
     } catch (e) { return []; }
   }
   function save(items) {
-    localStorage.setItem(KEY, JSON.stringify(items));
+    try { localStorage.setItem(KEY, JSON.stringify(items)); }
+    catch (e) { if (window.console) console.warn('[时念] 保存念想失败（已跳过）:', e); }
   }
 
   // ---------- 许愿池（v0.5.9） ----------
@@ -331,6 +332,8 @@
     var items = load();
     var list = document.getElementById('cdList');
     var empty = document.getElementById('cdEmpty');
+    // v0.6.3 安全兜底：容器缺失时不渲染（tickClock 跨天等调用路径可能早于 DOM 就绪）
+    if (!list) return;
 
     // FLIP · First：重建前先记下每条的位置
     var firstTop = {};
@@ -715,10 +718,18 @@
   function autoRefreshWeather() {
     if (!currentCity) return;
     ShiNianWeather.refresh(currentCity).then(function (data) {
-      updateWeatherDisplay(data);
-      window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: currentCity, weather: data}}));
+      // v0.6.3 · P0 修复：自动刷新失败时 data 为 null（超时/网络错），
+      // 此时切勿调用 updateWeatherDisplay(null) —— 那会把上次有效的温度清空，
+      // 移动端偶发慢网会周期性「温度闪没」。仅当拿到新数据才更新显示，
+      // 失败则静默保留上一次温度（降级）。
+      if (data) {
+        updateWeatherDisplay(data);
+        window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: currentCity, weather: data}}));
+      } else if (window.console) {
+        console.warn('[时念] 自动刷新天气失败（保留上次温度，降级）');
+      }
     }).catch(function () {
-      if (window.console) console.warn('[时念] 自动刷新天气失败（降级）');
+      if (window.console) console.warn('[时念] 自动刷新天气失败（保留上次温度，降级）');
     });
   }
   function stopWeatherAutoRefresh() {
@@ -797,6 +808,12 @@
     if (settings.decor) root.removeAttribute('data-no-decor');
     else root.setAttribute('data-no-decor', '');
     window.dispatchEvent(new CustomEvent('recipeChange'));   // 天空引擎立即重算
+    // v0.6.3 · P2：装饰层开关改变时，让运行中的季节彩蛋/流星立即生效或停止。
+    // 原仅设置 data-no-decor 属性，已触发的动画要等自身时长结束才停（最长 40s）；
+    // 这里联动 setEnabled，关→立即停止所有装饰，开→恢复（maybeTrigger 会在重试时重触发）。
+    if (window.ShiNianDecor && typeof window.ShiNianDecor.setEnabled === 'function') {
+      window.ShiNianDecor.setEnabled(settings.decor);
+    }
     syncSettingsUI();
     applyReminders();
   }
@@ -1277,6 +1294,17 @@
       if (window.console) console.warn('[时念] 城市数据加载失败（使用默认城市）');
     });
   }
+
+  // v0.6.3 · P1：暴露最小测试钩子（仅供单测使用，不影响运行时行为）。
+  // 与 decor.js 的 _test 保持一致：把需要断言的内部函数挂到 window，便于自动化校验。
+  window.ShiNianApp = {
+    autoRefreshWeather: autoRefreshWeather,
+    updateWeatherDisplay: updateWeatherDisplay,
+    startWeatherAutoRefresh: startWeatherAutoRefresh,
+    stopWeatherAutoRefresh: stopWeatherAutoRefresh,
+    getSettings: function () { return settings; },
+    setWeatherRefreshMin: function (v) { settings.weatherRefreshMin = v; }
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
