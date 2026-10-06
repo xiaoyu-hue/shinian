@@ -9,6 +9,12 @@
   "plugins": {
     "LocalNotifications": {
       "smallIcon": "ic_stat_shinian"
+    },
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#030d18",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
     }
   }
 }
