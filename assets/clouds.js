@@ -1,54 +1,72 @@
-/* 时念 · 云彩引擎 v2.2（v0.6.6 深度优化：真实云物理 + 移动/桌面分级）
-   v0.6.8 热修：修复「云被渲染成纯黑」与「夜间云发暖棕」两个着色缺陷，详见下方【v0.6.8 修复】。
+/* 时念 · 云彩引擎 v3（v0.7.0 天穹重构）
    ------------------------------------------------------------
-   设计目标（对照真实云的逻辑）：
-   1) 多层视差：高空卷云(快/薄/透) → 中层(中速/蓬松) → 低层(慢/宽/厚)，
-      各层独立速度，形成真实的「深度感」与「风的差异」。
-   2) 真实云型：
-      - cumulus 积云：平底边 + 顶部圆滚隆起（经典花菜状）
-      - stratus  层云：横向铺开的扁平薄片（阴天/多云）
-      - stratus-low / fog 贴地层云：贴近地平线、极宽极扁（雾）
-      - storm    风暴云：暗、厚、垂直发展（雨/雪/雷）
-      - cirrus   卷云：高空纤细拉丝（仅高层）
-   3) 太阳光照（关键真实感）：
-      - 由时刻推算太阳方位（日出偏东、正午当头、日落偏西）与仰角
-      - 迎光面更亮、背光面更暗（云体自阴影）
-      - 顶部比底部更亮（积云平底下亮上暗）
-      - 晨昏（低仰角）时迎光面染暖金色（golden hour 轮廓光）
-   4) 天气联动：读 :root[data-weather] 选云型/亮度/浓度/覆盖（阴雨雪增多、晴空减少）
-   5) 移动端 / 桌面端深度分级：
-      - 桌面：3 层、DPR≤2、内部渲染分辨率 1.0、FPS 30、云更密更细
-      - 移动：2 层(去掉卷云)、DPR≤1.5、内部渲染分辨率 0.62（柔边云放大无损）、FPS 24、云更简
-      - 省电：切后台暂停、减弱动态静态、dt 钳制
-   6) 降级守卫：无 2D 上下文时 draw 直接跳过；噪声内置（零依赖）
-   依赖：无外部运行时（噪声内置，与 vendored lunar.js 同类） */
+   v3 相对 v2 的根本改变：**换渲染内核**。
+   v2 是「柔边圆堆叠」（本质是 metaball），数学上天生抱团，调参改不掉「聚成一坨」。
+   v3 改为「fBm 噪声场 + 密度阈值 + 域翘曲」，业界标准做法：
+
+   M1 噪声内核：hash → value noise → fBm（多倍频叠加）→ 双层侵蚀（粗层裂片 / 细层丝缕）
+   M2 真实形态：
+     - 网格放置 + 大部分格子留空  → 云与云之间保留开阔天空（根治聚团）
+     - 积云平底：中心以上更高、以下更平 + 底部硬切
+     - 自阴影：云内下暗上亮（白天）/ 下亮上暗（低太阳）
+     - 远层雾化：向天空色混合，距离感 = 雾霭
+   M3 流动演变：风场平流（云在噪声场中穿行）+ 湍流时间项（持续变形）+ 多层视差
+   M4 太阳光照：迎光/背光、银边效应(silver lining)、火烧云高度渐变（底橙红→中粉→顶紫蓝）
+
+   架构要点：
+     - 云场在**低分辨率**（1/6~1/7）逐像素算密度写入像素数组，再放大贴图
+       （浏览器双线性插值 → 天然柔边；既是性能优化也是画质技巧）
+     - 像素数组是纯 JS 计算，**不依赖 canvas**，因此可在无 canvas 环境（jsdom）中测试
+     - canvas 仅用于最后的放大贴图；不可用时优雅降级（不画，但像素仍可测）
+   依赖：无外部运行时（噪声自研；太阳数据优先取 ShiNianSunMoon，缺失时近似兜底） */
 (function () {
   'use strict';
 
-  // ---- 内置微型平滑噪声（1D 余弦插值，无依赖）----
-  function Noise(seed) { this.seed = (seed | 0) || 1; }
-  Noise.prototype._r = function (i) {
-    var x = Math.sin((i * 127.1 + this.seed * 311.7)) * 43758.5453;
-    return x - Math.floor(x);
-  };
-  Noise.prototype.v = function (t) {
-    var i = Math.floor(t), f = t - i;
-    var a = this._r(i), b = this._r(i + 1);
-    var u = f * f * (3 - 2 * f);     // smoothstep
-    return a + (b - a) * u;          // 0..1
-  };
+  // ---------- 通用数学 ----------
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function ss(e0, e1, x) { var t = (x - e0) / (e1 - e0); t = t < 0 ? 0 : (t > 1 ? 1 : t); return t * t * (3 - 2 * t); }
+  function mix(a, b, t) { return a + (b - a) * t; }
+  function mix3(a, b, t) { return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)]; }
+  function shade(c, amt) {
+    if (amt >= 0) return [c[0] + (255 - c[0]) * amt, c[1] + (255 - c[1]) * amt, c[2] + (255 - c[2]) * amt];
+    var a = -amt; return [c[0] * (1 - a), c[1] * (1 - a), c[2] * (1 - a)];
+  }
 
-  // ---- 时刻 → 云基础染色（与 sky.js 同一套观感：暗蓝灰夜→暖金黎明/日落→近白白天）----
+  // ---------- 噪声内核（零依赖，自研）----------
+  function hash2(ix, iy, seed) {
+    var n = Math.sin(ix * 127.1 + iy * 311.7 + seed * 74.7) * 43758.5453;
+    return n - Math.floor(n);
+  }
+  function vnoise(x, y, seed) {
+    var ix = Math.floor(x), iy = Math.floor(y);
+    var fx = x - ix, fy = y - iy;
+    var ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+    var a = hash2(ix, iy, seed), b = hash2(ix + 1, iy, seed);
+    var c = hash2(ix, iy + 1, seed), d = hash2(ix + 1, iy + 1, seed);
+    var t = a + (b - a) * ux, bo = c + (d - c) * ux;
+    return t + (bo - t) * uy;
+  }
+  // fBm：多倍频叠加，得到「大团块 + 中结构 + 细边缘」的多尺度形态
+  function fbm(x, y, oct, seed) {
+    var v = 0, amp = 0.5, f = 1, norm = 0;
+    for (var i = 0; i < oct; i++) {
+      v += amp * vnoise(x * f, y * f, seed + i * 17);
+      norm += amp; f *= 2; amp *= 0.5;
+    }
+    return norm > 0 ? v / norm : 0;
+  }
+
+  // ---------- 时刻 → 云基础染色 ----------
   var TINTS = [
-    { h: 0,    c: [38, 52, 78],   a: 0.16 }, // 深夜
-    { h: 5,    c: [70, 86, 120],  a: 0.20 }, // 凌晨
-    { h: 6.5,  c: [226, 178, 150],a: 0.30 }, // 黎明暖
-    { h: 9,    c: [244, 248, 252],a: 0.42 }, // 上午近白
-    { h: 13,   c: [248, 250, 253],a: 0.44 }, // 正午
-    { h: 17,   c: [246, 240, 232],a: 0.42 }, // 午后
-    { h: 18.8, c: [240, 188, 142],a: 0.36 }, // 日落暖金
-    { h: 20.5, c: [120, 132, 162],a: 0.24 }, // 暮色
-    { h: 22,   c: [50, 64, 92],   a: 0.18 }, // 夜
+    { h: 0,    c: [38, 52, 78],   a: 0.16 },
+    { h: 5,    c: [70, 86, 120],  a: 0.20 },
+    { h: 6.5,  c: [226, 178, 150],a: 0.30 },
+    { h: 9,    c: [244, 248, 252],a: 0.42 },
+    { h: 13,   c: [248, 250, 253],a: 0.46 },
+    { h: 17,   c: [246, 240, 232],a: 0.42 },
+    { h: 18.8, c: [240, 188, 142],a: 0.36 },
+    { h: 20.5, c: [120, 132, 162],a: 0.24 },
+    { h: 22,   c: [50, 64, 92],   a: 0.18 },
     { h: 24,   c: [38, 52, 78],   a: 0.16 }
   ];
   function tintAt(hour) {
@@ -64,7 +82,6 @@
       a: a.a + (b.a - a.a) * t
     };
   }
-
   function nowHour() {
     var q = (typeof location !== 'undefined' && location.search)
       ? new URLSearchParams(location.search).get('t') : null;
@@ -73,49 +90,77 @@
     return d.getHours() + d.getMinutes() / 60;
   }
 
-  // ---- 太阳方位（用于云体光照，自包含、零依赖）----
-  // 默认锚点对齐 sky.js（日出 ~6.3、日落 ~18.4）；返回：
-  //   x    : 太阳水平方位，-1(西/日落侧) .. +1(东/日出侧)
-  //   elev : 仰角 0(地平) .. 1(正午当头)
-  //   gold : 暖金色强度 0..1（低仰角晨昏最强，正午近 0）
-  function sunInfo(hour) {
-    var sr = 6.3, ss = 18.4;
-    var day = (hour - sr) / (ss - sr);            // 0 日出 .. 1 日落（夜间为负或 >1）
-    var above = (day >= 0 && day <= 1);           // 太阳是否在地平线之上
-    var dc = Math.max(0, Math.min(1, day));       // 仅用于方位插值
-    var x = 1 - 2 * dc;                           // 日出(+1,东) → 日落(-1,西)
-    // 修复（v0.6.8）：此前 day 被钳制后再算仰角，导致深更半夜被当成 day=0/1，
-    // 仰角≈0 → gold=1（最强暖金），午夜的云被涂上 golden hour 暖光成暖棕色。
-    // 现在太阳在地平线下时：仰角 0、暖金 0（无阳光），由 draw() 改为均匀冷暗。
-    var elev = above ? Math.sin(dc * Math.PI) : 0;  // 0 两端, 1 正午
-    var gold = above ? Math.pow(1 - elev, 1.6) : 0; // 低仰角(晨昏)更暖；夜间无
-    return { x: x, elev: elev, gold: gold, above: above };
+  // ---------- 火烧云配色：云底橙红 → 中部粉 → 顶部紫蓝 ----------
+  var FIRE_BOT = [255, 104, 52], FIRE_MID = [255, 158, 128], FIRE_TOP = [140, 128, 186];
+  function fireColor(hf) {
+    return hf < 0.5 ? mix3(FIRE_BOT, FIRE_MID, hf / 0.5)
+                    : mix3(FIRE_MID, FIRE_TOP, (hf - 0.5) / 0.5);
+  }
+  // 火烧云强度：太阳高度角越接近地平线越强（峰值约 +2°）
+  function fireAmount(sun) {
+    var f = 1 - Math.abs(sun.alt - 2) / 13;
+    return f > 0 ? Math.pow(f, 1.25) : 0;
   }
 
-  // ---- 天气 → 云型/亮度/浓度/覆盖（沿用既有 data-weather 信号）----
+  // ---------- 太阳状态（优先用真实 SunCalc，缺失时近似兜底）----------
+  function sunState(hour) {
+    var ext = null;
+    try {
+      if (typeof window !== 'undefined' && window.ShiNianSunMoon &&
+          typeof window.ShiNianSunMoon.get === 'function') {
+        ext = window.ShiNianSunMoon.get();
+      }
+    } catch (e) { ext = null; }
+    if (ext && ext.sun && typeof ext.sun.altitudeDeg === 'number') {
+      var s = ext.sun;
+      return { alt: s.altitudeDeg, az: s.azimuthDeg, above: s.altitudeDeg > -0.5, real: true };
+    }
+    // 近似兜底（未接 SunCalc 时）：日出 6.3 / 日落 18.4
+    // 方位角采用 SunCalc 约定（0=南，西为正）：日出≈-90°（东/画面左），日落≈+90°（西/画面右）
+    var sr = 6.3, sh = 18.4;
+    var day = (hour - sr) / (sh - sr);
+    var above = day >= 0 && day <= 1;
+    var dc = clamp(day, 0, 1);
+    var alt = above ? Math.sin(dc * Math.PI) * 62 : -10;
+    var az = -90 + dc * 180;
+    return { alt: alt, az: az, above: above, real: false };
+  }
+
+  // ---------- 天气 → 覆盖/云型/亮度 ----------
   var WEATHER = {
-    clear:         { count: 0.42, alpha: 0.70, type: 'cumulus',     bright: 1.00, coverage: 0.30 },
-    'partly-cloudy':{ count: 0.70, alpha: 0.85, type: 'cumulus',     bright: 1.00, coverage: 0.50 },
-    cloudy:        { count: 0.88, alpha: 0.88, type: 'stratus',      bright: 0.96, coverage: 0.65 },
-    fog:           { count: 0.80, alpha: 0.80, type: 'stratus-low',  bright: 1.05, coverage: 0.75, hug: true },
-    drizzle:       { count: 0.92, alpha: 0.95, type: 'storm',        bright: 0.86, coverage: 0.70 },
-    rain:          { count: 0.95, alpha: 0.95, type: 'storm',        bright: 0.84, coverage: 0.72 },
-    snow:          { count: 0.88, alpha: 0.88, type: 'storm',        bright: 0.94, coverage: 0.68, cool: true },
-    thunderstorm:  { count: 0.98, alpha: 0.92, type: 'storm',        bright: 0.82, coverage: 0.75 }
+    clear:          { coverage: 0.30, alpha: 0.72, type: 'cumulus',     bright: 1.00 },
+    'partly-cloudy':{ coverage: 0.52, alpha: 0.88, type: 'cumulus',     bright: 1.00 },
+    cloudy:         { coverage: 0.90, alpha: 0.95, type: 'stratus',     bright: 0.94 },
+    fog:            { coverage: 1.00, alpha: 0.88, type: 'stratus-low', bright: 1.02, hug: true },
+    drizzle:        { coverage: 0.80, alpha: 1.00, type: 'storm',       bright: 0.80 },
+    rain:           { coverage: 0.86, alpha: 1.02, type: 'storm',       bright: 0.76 },
+    snow:           { coverage: 0.78, alpha: 0.95, type: 'storm',       bright: 0.90, cool: true },
+    thunderstorm:   { coverage: 0.90, alpha: 1.05, type: 'storm',       bright: 0.70 }
   };
   function weatherProfile() {
     var w = (typeof document !== 'undefined')
       ? document.documentElement.getAttribute('data-weather') : null;
-    return WEATHER[w] || { count: 0.72, alpha: 0.88, type: 'cumulus', bright: 0.98, coverage: 0.55 };
+    return WEATHER[w] || { coverage: 0.48, alpha: 0.86, type: 'cumulus', bright: 0.98 };
   }
-  function densityFromWeather() {            // 保留旧接口（兼容性 / 单测）
+  function densityFromWeather() {           // 保留旧接口（兼容性 / 单测）
     var p = weatherProfile();
-    return { count: p.count, alpha: p.alpha };
+    return { count: Math.round(p.coverage * 10), alpha: p.alpha };
   }
 
-  // ---- 设备分级（移动 / 桌面）----
-  var DESKTOP = { dpr: 2,   resScale: 1.00, fps: 30, baseCount: 5, blobsMin: 7, blobsMax: 12, layers: ['high', 'mid', 'low'] };
-  var MOBILE  = { dpr: 1.5, resScale: 0.62, fps: 24, baseCount: 3, blobsMin: 4, blobsMax: 8,  layers: ['mid', 'low'] };
+  // ---------- 云层（远 → 近；远的慢、近的快，形成视差纵深）----------
+  var LAYER_CFG = {
+    high: { band: [0.02, 0.32], cols: 5, rows: 2, rx: [0.12, 0.24], ry: [0.028, 0.055],
+            speed: 0.0026, alpha: 0.40, haze: 0.62, erode: 0.62, thr: 0.52 },
+    mid:  { band: [0.08, 0.55], cols: 4, rows: 2, rx: [0.15, 0.28], ry: [0.060, 0.110],
+            speed: 0.0055, alpha: 0.74, haze: 0.30, erode: 0.52, thr: 0.46 },
+    low:  { band: [0.32, 0.88], cols: 3, rows: 2, rx: [0.20, 0.36], ry: [0.090, 0.160],
+            speed: 0.0105, alpha: 0.96, haze: 0.10, erode: 0.46, thr: 0.44 }
+  };
+  var LAYER_ORDER = ['high', 'mid', 'low'];   // 由远及近绘制
+
+  // ---------- 设备分级 ----------
+  var DESKTOP = { dpr: 2, resScale: 1.0, fps: 30, div: 6, oct: 4, layers: ['high', 'mid', 'low'] };
+  var MOBILE  = { dpr: 1.5, resScale: 1.0, fps: 24, div: 7, oct: 3, layers: ['mid', 'low'] };
   function detectQuality(opts) {
     opts = opts || {};
     if (opts.quality === 'desktop') return DESKTOP;
@@ -130,185 +175,246 @@
     } catch (e) { mobile = false; }
     return mobile ? MOBILE : DESKTOP;
   }
-
-  // ---- 云层参数（视差：speed 越大越快；alpha 越大越靠前不透）----
-  var LAYERS = {
-    high: { yTop: 0.04, yBot: 0.22, scale: 0.7, speed: [14, 22], alpha: 0.50 },
-    mid:  { yTop: 0.12, yBot: 0.52, scale: 1.0, speed: [6, 12],  alpha: 0.78 },
-    low:  { yTop: 0.34, yBot: 0.80, scale: 1.3, speed: [2.5, 5.5], alpha: 0.95 }
-  };
-
-  // ---- 颜色工具 ----
-  function shade(c, amt) { // amt>0 提亮, <0 压暗
-    if (amt >= 0) return [c[0] + (255 - c[0]) * amt, c[1] + (255 - c[1]) * amt, c[2] + (255 - c[2]) * amt];
-    var a = -amt; return [c[0] * (1 - a), c[1] * (1 - a), c[2] * (1 - a)];
-  }
-  function warm(c, amt) { // 加暖（红升蓝降）
-    return [c[0] + (255 - c[0]) * amt * 0.9, c[1] + (255 - c[1]) * amt * 0.25, c[2] * (1 - amt * 0.4)];
-  }
-  function mix(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
-  function clamp255(v) { v = v < 0 ? 0 : (v > 255 ? 255 : v); return v | 0; }
-  function rgba(c, a) {
-    return 'rgba(' + clamp255(c[0]) + ',' + clamp255(c[1]) + ',' + clamp255(c[2]) + ',' + a.toFixed(3) + ')';
-  }
-
-  // ---- 选云型 ----
-  function pickKind(layer, p) {
-    if (layer === 'high') return (p.type === 'storm') ? (Math.random() < 0.5 ? 'cirrus' : 'storm') : 'cirrus';
-    if (p.type === 'cumulus') return 'cumulus';
+  function pickKind(layerId, p) {
+    if (layerId === 'high') return (p.type === 'storm') ? 'storm' : 'cirrus';
     if (p.type === 'storm') return 'storm';
     if (p.type === 'stratus' || p.type === 'stratus-low') return 'stratus';
     return 'cumulus';
   }
 
-  // ---- 云场 ----
+  // ---------- 云型轮廓（u: -1..1 横向；v: -1 顶 .. +1 底）----------
+  function shapeAt(u, v, kind) {
+    var vv, d, s;
+    if (kind === 'stratus' || kind === 'stratus-low') {   // 扁平薄片
+      vv = v * 2.4; d = Math.sqrt(u * u * 0.85 + vv * vv);
+      s = 1 - ss(0.45, 1.0, d);
+    } else if (kind === 'cirrus') {                        // 高空细丝
+      vv = v * 3.6; d = Math.sqrt(u * u * 0.50 + vv * vv);
+      s = 1 - ss(0.40, 1.0, d);
+    } else if (kind === 'storm') {                         // 暗厚、垂直发展
+      vv = v > 0 ? v * 1.30 : v * 0.72; d = Math.sqrt(u * u * 0.88 + vv * vv);
+      s = 1 - ss(0.44, 1.0, d);
+      s *= 1 - ss(0.72, 1.06, v);
+    } else {                                               // cumulus：平底积云
+      vv = v > 0 ? v * 1.95 : v * 0.88;                    // 下半部压缩 → 底更平
+      d = Math.sqrt(u * u + vv * vv);
+      s = 1 - ss(0.40, 1.0, d);
+      s *= 1 - ss(0.50, 0.96, v);                          // 底部硬切 = 平底
+    }
+    return s < 0 ? 0 : s;
+  }
+
+  // ---------- 云场 ----------
   function Field(opts) {
     opts = opts || {};
     this.w = opts.w || 360; this.h = opts.h || 640;
-    this.noise = new Noise((Math.random() * 1e6) | 0);
     this._q = detectQuality(opts);
-    this._profile = weatherProfile();
-    this._clock = 0;
-    this._alphaMul = 1; this._countMul = 1;
+    this._p = weatherProfile();
+    this._t = 0;
     this._hour = nowHour();
+    this._seed = (Math.random() * 100000) | 0;
     this.clouds = [];
+    this._alloc();
     this.reseed();
   }
-  Field.prototype.resize = function (w, h) { this.w = w; this.h = h; };
-  Field.prototype.setWeather = function () {
-    this._profile = weatherProfile();
-    this.reseed();
+  Field.prototype._alloc = function () {
+    var div = this._q.div;
+    this.fw = Math.max(20, Math.round(this.w / div));
+    this.fh = Math.max(20, Math.round(this.h / div));
+    this.buf = new Uint8ClampedArray(this.fw * this.fh * 4);
+    this._off = null; this._offCtx = null; this._img = null;
   };
+  Field.prototype.resize = function (w, h) { this.w = w; this.h = h; this._alloc(); };
+  Field.prototype.setWeather = function () { this._p = weatherProfile(); this.reseed(); };
+
+  // 网格放置：大部分格子留空 → 云之间保留开阔天空（根治「聚成一坨」）
   Field.prototype.reseed = function () {
-    var q = this._q, p = this._profile;
+    var q = this._q, p = this._p, seed = this._seed;
     var layers = p.hug ? ['low'] : q.layers;
-    var total = Math.max(2, Math.round(q.baseCount * p.count));
-    var weights = { high: 0.22, mid: 0.40, low: 0.38 };
-    if (layers.length === 1) weights = { low: 1 };
-    else if (layers.length === 2) weights = { mid: 0.5, low: 0.5 };
     this.clouds = [];
     for (var li = 0; li < layers.length; li++) {
-      var ly = layers[li];
-      var cnt = Math.max(1, Math.round(total * (weights[ly] || 0.34)));
-      for (var i = 0; i < cnt; i++) {
-        this.clouds.push(this._makeCloud(ly, pickKind(ly, p), p, q));
+      var id = layers[li], L = LAYER_CFG[id];
+      var kind = pickKind(id, p);
+      var cov = p.coverage * (id === 'low' ? 1.0 : 0.82);
+      var band = (p.hug && id === 'low') ? [0.60, 0.99] : L.band;
+      var cols = (p.hug && id === 'low') ? 4 : L.cols;   // 雾：更密的贴地宽带
+      for (var r = 0; r < L.rows; r++) {
+        for (var c = 0; c < cols; c++) {
+          if (hash2(c, r, seed + li * 97) > cov) continue;      // 空格子 = 蓝天留白
+          var hx = hash2(c, r, seed + 311 + li * 17);
+          var hy = hash2(c, r, seed + 727 + li * 23);
+          var hz = hash2(c, r, seed + 991 + li * 29);
+          var rrx = L.rx[0] + hz * (L.rx[1] - L.rx[0]);
+          var rry = L.ry[0] + hz * (L.ry[1] - L.ry[0]);
+          // 按云型修正体量：层云更宽更薄、卷云更长更细、风暴更高更厚
+          if (kind === 'stratus') { rrx *= 1.50; rry *= 1.15; }   // 层云：宽而连绵
+          else if (kind === 'cirrus') { rrx *= 1.30; rry *= 0.72; }
+          else if (kind === 'storm') { rrx *= 1.12; rry *= 1.40; }
+          if (p.hug) { rrx *= 1.45; rry *= 1.30; }                // 雾：贴地更宽更厚
+          this.clouds.push({
+            layer: id, kind: kind,
+            x: (c + 0.15 + hx * 0.7) / cols,
+            y: band[0] + hy * (band[1] - band[0]),
+            rx: rrx, ry: rry,
+            speed: L.speed, alpha: L.alpha, haze: L.haze, erode: L.erode, thr: L.thr,
+            band: band,
+            seed: (hash2(c, r, seed + 555 + li * 41) * 1000) | 0
+          });
+        }
       }
     }
-  };
-
-  Field.prototype._makeCloud = function (layer, kind, p, q) {
-    var L = LAYERS[layer];
-    var baseR = (layer === 'high' ? 46 : layer === 'low' ? 68 : 54) * L.scale * (0.8 + Math.random() * 0.5);
-    if (p.hug && layer === 'low') baseR *= 1.15;       // 雾：贴地略宽
-    var nb = q.blobsMin + Math.floor(Math.random() * (q.blobsMax - q.blobsMin + 1));
-    if (kind === 'cirrus') nb = Math.max(5, Math.round(nb * 0.5));
-    var blobs = [];
-    var rnd = Math.random;
-    if (kind === 'stratus') {
-      var sheetH = baseR * 0.5;
-      for (var s = 0; s < nb; s++) {
-        blobs.push({
-          dx: (rnd() - 0.5) * baseR * 2.5,
-          dy: (rnd() - 0.5) * sheetH,
-          r: baseR * (0.22 + rnd() * 0.26),
-          sx: 1.5 + rnd() * 0.9, sy: 0.62          // 横向铺开、压扁
-        });
-      }
-    } else if (kind === 'cirrus') {
-      for (var c2 = 0; c2 < nb; c2++) {
-        blobs.push({
-          dx: (rnd() - 0.5) * baseR * 4.2,
-          dy: (rnd() - 0.5) * baseR * 0.5,
-          r: baseR * (0.5 + rnd() * 0.7),
-          sx: 2.6 + rnd() * 1.8, sy: 0.26 + rnd() * 0.18   // 极薄长丝
-        });
-      }
-    } else { // cumulus / storm：平底边 + 顶部隆起
-      var baseLine = baseR * 0.26;
-      for (var k = 0; k < nb; k++) {
-        var ang = rnd() * Math.PI * 2;
-        var rad = rnd() * baseR * 0.66;
-        var dx = Math.cos(ang) * rad;
-        var dy = baseLine - rnd() * baseR * (kind === 'storm' ? 1.2 : 0.95);
-        if (rnd() < 0.25) dy = baseLine + rnd() * baseR * 0.15;   // 少量落于底边 → 平基底
-        blobs.push({ dx: dx, dy: dy, r: baseR * (0.34 + rnd() * 0.42) });
-      }
+    // 兜底：至少 2 朵（兼容既有结构断言，也避免极端天气下天空全空）
+    while (this.clouds.length < 2) {
+      var L2 = LAYER_CFG.low;
+      this.clouds.push({
+        layer: 'low', kind: pickKind('low', p),
+        x: 0.2 + Math.random() * 0.6, y: 0.4 + Math.random() * 0.3,
+        rx: L2.rx[0], ry: L2.ry[0],
+        speed: L2.speed, alpha: L2.alpha, haze: L2.haze, erode: L2.erode, thr: L2.thr,
+        band: L2.band, seed: (Math.random() * 1000) | 0
+      });
     }
-    var yTop = (p.hug && layer === 'low') ? 0.74 : L.yTop;
-    var yBot = (p.hug && layer === 'low') ? 0.96 : L.yBot;
-    return {
-      layer: layer, kind: kind, blobs: blobs,
-      x: rnd() * (this.w + baseR * 2) - baseR,
-      yFrac: yTop + rnd() * (yBot - yTop),
-      baseR: baseR,
-      speed: L.speed[0] + rnd() * (L.speed[1] - L.speed[0]),
-      layerAlpha: L.alpha,
-      seed: rnd() * 1000
-    };
   };
 
   Field.prototype.update = function (dt) {
-    this._clock += dt;
+    this._t += dt;                                  // 湍流时间项 → 云持续变形
     for (var i = 0; i < this.clouds.length; i++) {
       var c = this.clouds[i];
-      var L = LAYERS[c.layer];
-      var sp = c.speed * (0.85 + 0.3 * this.noise.v(this._clock * 0.02 + c.seed)); // 噪声微扰速度，非恒定
-      c.x += sp * dt;
-      var edge = c.baseR * (c.kind === 'stratus' ? 2.4 : 1.4);
-      if (c.x - edge > this.w + edge + 30) {                 // 出右界 → 左界回卷（无缝）
-        c.x = -edge - 20 - Math.random() * this.w * 0.2;
-        c.yFrac = L.yTop + Math.random() * (L.yBot - L.yTop);
-        c.seed = Math.random() * 1000;
+      c.x += c.speed * dt;                          // 风场平流
+      if (c.x - c.rx > 1.18) {                      // 出右界 → 左界回卷并换形态
+        c.x = -0.18 - c.rx - Math.random() * 0.15;
+        c.y = c.band[0] + Math.random() * (c.band[1] - c.band[0]);
+        c.seed = (Math.random() * 1000) | 0;
       }
     }
   };
 
-  Field.prototype.draw = function (ctx, nowMs, reduced) {
-    if (!ctx) return;
+  Field.prototype.render = function (reduced) {
+    var buf = this.buf; buf.fill(0);
     this._hour = nowHour();
-    var sun = sunInfo(this._hour);
-    var baseTint = tintAt(this._hour);
-    // 修复（v0.6.8）：tintAt 返回 {r,g,b,a} 对象，而 shade/warm/mix 期望 [r,g,b] 数组。
-    // 此前直接把对象传给 shade() 会取到 undefined → NaN → 被 clamp255 强转为 0，
-    // 导致所有云被渲染成 rgba(0,0,0,α) 纯黑（即「大黑乌云」的根因）。
-    // 这里显式拆出 [r,g,b] 供着色计算，透明度仍用 baseTint.a。
-    var bt = [baseTint.r, baseTint.g, baseTint.b];
-    var h = this.h, w = this.w;
-    var p = this._profile;
-    var sh = shade(bt, -0.16);                 // 背光暗部基准（轻压暗，避免成片发黑）
-    for (var i = 0; i < this.clouds.length; i++) {
-      var c = this.clouds[i];
-      var cy = c.yFrac * h;
-      var nx = reduced ? 0 : (this.noise.v(this._clock * 0.05 + c.seed) - 0.5) * c.baseR * 0.12;
-      var ny = reduced ? 0 : (this.noise.v(this._clock * 0.035 + c.seed + 50) - 0.5) * c.baseR * 0.05;
-      var baseA = baseTint.a * c.layerAlpha * p.alpha * this._alphaMul;
-      var baseSy = (c.layer === 'low') ? 0.9 : 1;    // 低层轻微透视压扁
-      for (var j = 0; j < c.blobs.length; j++) {
-        var b = c.blobs[j];
-        // 光照：迎光面更亮、顶部更亮、晨昏暖染
-        var sideNorm = Math.max(-1, Math.min(1, (b.dx) * sun.x / (c.baseR * 1.5)));
-        // 修复（v0.6.8）：夜间太阳在地平线下，无方向光，云体应均匀受环境光，
-        // 而非保留「一侧亮一侧暗」的日间光照逻辑（否则夜云一侧发暖发亮）。
-        var lit = sun.above ? (0.5 + 0.5 * sideNorm) : 0.5;   // 0(背)..1(迎)；夜间恒定 0.5
-        var top = b.dy < 0 ? 1 : 0;
-        var hi = shade(bt, 0.14 + 0.12 * top);
-        hi = warm(hi, sun.gold * lit * 0.55);                 // golden hour 暖轮廓
-        var col = mix(sh, hi, lit);
-        col = [col[0] * p.bright, col[1] * p.bright, col[2] * p.bright];
-        var a = baseA * (0.42 + 0.32 * lit);          // 单 blob 更通透
-        ctx.save();
-        ctx.translate(c.x + nx + b.dx, cy + ny + b.dy);
-        ctx.scale(b.sx || 1, (b.sy || 1) * baseSy);
-        var g = ctx.createRadialGradient(0, 0, 0, 0, 0, b.r);
-        g.addColorStop(0,    rgba(col, a));
-        g.addColorStop(0.45, rgba(col, a * 0.55));
-        g.addColorStop(1,    rgba(col, 0));
-        ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(0, 0, b.r, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
+    var sun = sunState(this._hour);
+    var tint = tintAt(this._hour);
+    var bt = [tint.r, tint.g, tint.b];
+    var p = this._p;
+    var shadowC = shade(bt, -0.34);
+    var litC = shade(bt, 0.14);
+    var fire = fireAmount(sun);
+    var sunX = 0.5 + 0.5 * Math.sin(sun.az * Math.PI / 180);  // SunCalc 约定：日出(-90°)→0 左，日落(+90°)→1 右
+    var aspect = this.fh / this.fw;
+    for (var oi = 0; oi < LAYER_ORDER.length; oi++) {
+      var lid = LAYER_ORDER[oi];
+      for (var i = 0; i < this.clouds.length; i++) {
+        if (this.clouds[i].layer !== lid) continue;
+        this._raster(this.clouds[i], sun, sunX, bt, shadowC, litC, fire, p, reduced, aspect);
       }
     }
   };
+
+  Field.prototype._raster = function (cl, sun, sunX, bt, shadowC, litC, fire, p, reduced, aspect) {
+    var fw = this.fw, fh = this.fh, buf = this.buf;
+    var cx = cl.x, cy = cl.y, rx = cl.rx, ry = cl.ry;
+    var x0 = Math.max(0, Math.floor((cx - rx * 1.5) * fw));
+    var x1 = Math.min(fw - 1, Math.ceil((cx + rx * 1.5) * fw));
+    var y0 = Math.max(0, Math.floor((cy - ry * 1.6) * fh));
+    var y1 = Math.min(fh - 1, Math.ceil((cy + ry * 1.6) * fh));
+    if (x1 < x0 || y1 < y0) return;
+
+    var t = this._t;
+    var windX = cl.x * 3.0;                       // 云在噪声场中穿行 → 形态随移动而变
+    var turb = reduced ? 0 : t * 0.012;           // 湍流演变
+    var nsC = 3.0, nsF = 8.0;
+    if (cl.kind === 'cirrus') { nsC = 2.4; nsF = 9.5; }
+    else if (cl.kind === 'stratus') { nsC = 2.0; nsF = 6.0; }
+    var thr = cl.thr, baseA = cl.alpha * p.alpha, bright = p.bright;
+    var sunDir = (sunX > cx) ? 1 : -1;            // 光从哪一侧来
+    var fireOn = fire > 0.02;
+
+    for (var y = y0; y <= y1; y++) {
+      var vy = (y / fh - cy) / ry;
+      if (vy < -1.7 || vy > 1.7) continue;
+      for (var x = x0; x <= x1; x++) {
+        var ux = (x / fw - cx) / rx;
+        var s = shapeAt(ux, vy, cl.kind);
+        if (s <= 0.002) continue;                 // 轮廓外：直接跳过（性能）
+
+        // 双层 fBm 侵蚀：粗层啃出裂片、细层撕出丝缕
+        var coarse = fbm((x / fw) * nsC + windX, (y / fh) * nsC * aspect + turb, 2, cl.seed);
+        var fine = fbm((x / fw) * nsF + windX * 1.7, (y / fh) * nsF * aspect + turb * 1.3, 2, cl.seed + 57);
+        var erode = coarse * 0.62 + fine * 0.38;
+        var d = s + (erode - 0.5) * cl.erode;
+        var a = ss(thr, thr + 0.30, d);
+        if (a <= 0.004) continue;                 // 低于阈值 = 蓝天留白
+
+        // 光照
+        var hf = clamp((1 - vy) * 0.5, 0, 1);     // 云内高度：1=顶 0=底
+        var face = 0.5 + 0.5 * (ux * sunDir);     // 迎光侧 1 / 背光侧 0
+        var lit;
+        if (!sun.above) lit = 0.42;                       // 夜间：无方向光
+        else if (sun.alt > 10) lit = mix(0.30, 1.0, hf);  // 白天：顶亮底暗
+        else lit = mix(0.95, 0.45, hf);                   // 低太阳：底亮顶暗
+        lit *= 0.60 + 0.40 * face;
+        lit = clamp(lit, 0, 1);
+        var col = mix3(shadowC, litC, lit);
+
+        // 火烧云：底橙红 → 中粉 → 顶紫蓝
+        if (fireOn) {
+          var fc = fireColor(hf);
+          col = mix3(col, fc, fire * (0.30 + 0.55 * (1 - hf)) * (0.55 + 0.45 * face));
+        }
+        // 银边效应：薄云迎光边缘透光发亮
+        var edge = 1 - ss(thr, thr + 0.26, d);
+        if (edge > 0.01 && face > 0.35) {
+          col = mix3(col, fireOn ? [255, 226, 190] : [255, 250, 240],
+                     edge * face * (sun.above ? 0.45 : 0.25));
+        }
+        if (cl.haze > 0) col = mix3(col, bt, cl.haze * 0.55);   // 远层雾化
+        col = [col[0] * bright, col[1] * bright, col[2] * bright];
+
+        var alpha = a * baseA;
+        if (alpha <= 0.004) continue;
+        // 源覆盖合成（由远及近）
+        var idx = (y * fw + x) * 4;
+        var da = buf[idx + 3] / 255;
+        var oa = alpha + da * (1 - alpha);
+        if (oa <= 0.004) continue;
+        buf[idx]     = (col[0] * alpha + buf[idx]     * da * (1 - alpha)) / oa;
+        buf[idx + 1] = (col[1] * alpha + buf[idx + 1] * da * (1 - alpha)) / oa;
+        buf[idx + 2] = (col[2] * alpha + buf[idx + 2] * da * (1 - alpha)) / oa;
+        buf[idx + 3] = oa * 255;
+      }
+    }
+  };
+
+  // canvas 仅用于最后的低分辨率放大贴图；环境不支持时优雅降级（像素仍可测）
+  Field.prototype._ensureOff = function () {
+    if (this._off && this._offCtx) return true;
+    try {
+      if (typeof document === 'undefined' || !document.createElement) return false;
+      var c = document.createElement('canvas');
+      c.width = this.fw; c.height = this.fh;
+      var c2 = c.getContext('2d');
+      if (!c2) return false;
+      this._off = c; this._offCtx = c2;
+      this._img = c2.createImageData(this.fw, this.fh);
+      return true;
+    } catch (e) { return false; }
+  };
+  Field.prototype.draw = function (ctx, nowMs, reduced) {
+    this.render(!!reduced);
+    if (!ctx) return;
+    if (!this._ensureOff()) return;
+    this._img.data.set(this.buf);
+    this._offCtx.putImageData(this._img, 0, 0);
+    try {
+      var prev = ctx.imageSmoothingEnabled;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(this._off, 0, 0, this.w, this.h);
+      ctx.imageSmoothingEnabled = prev;
+    } catch (e) { /* 目标上下文不支持 drawImage（如极简测试桩）→ 静默跳过 */ }
+  };
+  // 供测试读取真实像素（不依赖 canvas）
+  Field.prototype.pixels = function () { return this.buf; };
+  Field.prototype.fieldSize = function () { return { w: this.fw, h: this.fh }; };
 
   window.ShiNianClouds = {
     create: function (opts) { return new Field(opts); },
@@ -316,6 +422,8 @@
     densityFromWeather: densityFromWeather,
     weatherProfile: weatherProfile,
     config: function (opts) { return detectQuality(opts); },
-    Noise: Noise
+    fireAmount: fireAmount,
+    shapeAt: shapeAt,
+    Noise: { fbm: fbm, vnoise: vnoise, hash2: hash2 }
   };
 })();

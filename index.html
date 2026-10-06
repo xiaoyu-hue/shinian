@@ -19,6 +19,9 @@
 <script src="assets/season.js" defer></script>
 <script src="assets/sky.js" defer></script>
 <script src="assets/weather.js" defer></script>
+<!-- v0.7.0：SunCalc（vendored，BSD-2，许可头保留）→ 日月真实天文位置 / 月相 / 黄金时刻 -->
+<script src="assets/suncalc.js" defer></script>
+<script src="assets/sunmoon.js" defer></script>
   <!-- 本地提醒插件：仅在原生 APK（存在 window.Capacitor 桥）中加载；纯网页跳过以免报错 -->
   <script>
     if (window.Capacitor) {
@@ -49,6 +52,7 @@
     <div class="orb orb-a"></div>
     <div class="orb orb-b"></div>
     <div class="stars" id="stars" aria-hidden="true"></div>
+    <canvas class="sunmoon-canvas" id="sunmoonCanvas" aria-hidden="true"></canvas>
     <canvas class="cloud-canvas" id="cloudCanvas" aria-hidden="true"></canvas>
     <canvas class="decor-canvas" id="decorCanvas" aria-hidden="true"></canvas>
   </div>

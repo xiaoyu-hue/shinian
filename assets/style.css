@@ -124,6 +124,8 @@ main {
 .decor-canvas { position: absolute; inset: 0; pointer-events: none; }
 /* 云彩层（v0.6.5）：叠在星点之上、季节装饰之下，与主界面同属背景层 */
 .cloud-canvas { position: absolute; inset: 0; pointer-events: none; }
+/* 日月层（v0.7.0）：画在云之下 → 云会遮住日月，真实且好看 */
+.sunmoon-canvas { position: absolute; inset: 0; pointer-events: none; }
 
 /* ---- 玻璃 ---- */
 .glass {

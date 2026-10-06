@@ -1245,12 +1245,15 @@
     } catch (e) { startWeb(); }
   }
 
-  // v0.6.6：主天空云彩层（共享 ShiNianClouds 引擎，与开场同一片云）
+  // v0.7.0：主天空云彩层 + 日月层（共享 ShiNianClouds / ShiNianSunMoon，「同一片天」）
   function initSkyClouds() {
     var cv = document.getElementById('cloudCanvas');
     if (!cv || !window.ShiNianClouds) return;
     var ctx = cv.getContext('2d');
     if (!ctx) return;
+    // v0.7.0 M5：日月画布（画在云之下 → 云会遮住日月，真实且好看）
+    var smCv = document.getElementById('sunmoonCanvas');
+    var smCtx = (smCv && window.ShiNianSunMoon) ? smCv.getContext('2d') : null;
     // v0.6.6：消费云引擎设备分级（桌面 3 层 / DPR≤2 / 内部 1.0 / FPS30；移动 2 层 / DPR≤1.5 / 内部 0.62 / FPS24）
     var q = window.ShiNianClouds.config({});
     var dpr = Math.min(window.devicePixelRatio || 1, q.dpr);
@@ -1267,14 +1270,29 @@
       cv.height = Math.max(1, Math.round(h * dpr * rs));
       ctx.setTransform(dpr * rs, 0, 0, dpr * rs, 0, 0);
       field.resize(w, h);
+      if (smCtx && smCv) {                      // 日月画布与云画布同尺寸同变换
+        smCv.width = cv.width; smCv.height = cv.height;
+        smCtx.setTransform(dpr * rs, 0, 0, dpr * rs, 0, 0);
+      }
     }
     resize();
     window.addEventListener('resize', resize);
     // 城市/天气变化 → 云量随之增减（阴/雨/雪增多，晴空减少）
-    window.addEventListener('cityChange', function () { field.setWeather(); });
+    window.addEventListener('cityChange', function (e) {
+      field.setWeather();
+      // v0.7.0：城市变化 → 日月按新坐标重算
+      var c = e && e.detail && e.detail.city;
+      if (c && typeof c.lat === 'number' && window.ShiNianSunMoon) {
+        window.ShiNianSunMoon.setCity(c.lat, c.lon);
+      }
+    });
     function frame(ts) {
       if (!last) last = ts;
       var dt = (ts - last) / 1000; last = ts; acc += dt * 1000;
+      if (smCtx && window.ShiNianSunMoon) {     // 先画日月（下层），云覆盖其上
+        smCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        window.ShiNianSunMoon.draw(smCtx, window.innerWidth, window.innerHeight);
+      }
       if (reduce) {
         field.draw(ctx, ts, true);
       } else {
