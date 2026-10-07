@@ -1,8 +1,19 @@
-.DS_Store
-Thumbs.db
-node_modules/
+# 本地开发 / 调试残留（不随 push.py 显式清单发布，也不应进版本库）
+cloud-preview.html
+patch_app.py
+patch_s34.py
+patch_wish.py
+release_only.py
+sm_debug.html
+sm_debug*.png
+preview*.png
+_t*.log
+__pycache__/
+
+# 构建产物 / 生成物（由 CI 在云端生成，不入库）
 www/
-android/app/build/
-android/.gradle/
-android/build/
-android/capacitor-cordova-android-plugins/
+android/
+node_modules/
+*.jks
+*.keystore
+

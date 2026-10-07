@@ -1,96 +1,94 @@
-name: 构建 Android APK
+name: Build APK
 
 on:
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: 'APK 上传到哪个 Release（tag 名，如 v0.6.1）'
+      build_type:
+        description: 'APK 类型'
         required: true
-        default: 'v0.6.1'
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+# 默认 GITHUB_TOKEN 即可（上传 artifact / 建 Release 用），无需额外权限提升。
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 安装 Node.js
+      - name: 配置 Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: 设置 Java 21
+      - name: 配置 Java (用于 Gradle)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
       - name: 安装依赖
-        run: npm install
+        run: npm ci
 
-      - name: 构建 Web 资源
-        run: npm run build
+      - name: 运行自动化测试（质量门）
+        run: npm test
 
-      - name: 添加 Android 平台
-        run: npx cap add android
+      - name: 发布态构建 (www/)
+        run: npm run build:release
 
-      - name: 应用专属图标与启动画面
-        run: cp -rv resources/android/res/. android/app/src/main/res/
+      - name: 注入 Capacitor Android 平台（首次生成 android/）
+        run: test -d android || npx cap add android
 
-      - name: 同步 Web 资源到 Android
+      - name: 同步 Web 资源到原生工程
         run: npx cap sync android
 
-      # 签名准备：仅在仓库配置了 KEYSTORE_BASE64 等 Secrets 时才走正式签名包
-      - name: 准备签名（如配置了 Secrets）
-        id: sign
-        run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
-            echo "has_sign=1" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_sign=0" >> "$GITHUB_OUTPUT"
-          fi
+      - name: 配置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 安装 Android 编译依赖（与 Capacitor 6 的 compileSdk 对齐）
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+      - name: 构建 Debug APK（验证通道，无需签名）
+        if: ${{ inputs.build_type == 'debug' }}
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+
+      - name: 构建 Release APK（签名，密钥仅来自 Secrets）
+        if: ${{ inputs.build_type == 'release' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-
-      - name: 构建 Release APK（已签名 · 正式包）
-        if: steps.sign.outputs.has_sign == '1'
-        working-directory: android
-        env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          bash gradlew assembleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file="$(pwd)/app/release.keystore" \
-            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+          cd android
+          echo "$KEYSTORE_BASE64" | base64 -d > app/release-key.jks
+          # 将签名配置写入 gradle（仅内存/临时文件，不入库）
+          cat >> app/build.gradle <<'GRADLE'
 
-      # 容错降级：未配置签名时仍产出可安装的 Debug APK（用 debug 签名）
-      - name: 构建 Debug APK（未配置签名时的可安装降级包）
-        if: steps.sign.outputs.has_sign != '1'
-        working-directory: android
-        run: bash gradlew assembleDebug --no-daemon
+          android {
+            signingConfigs {
+              release {
+                storeFile file("release-key.jks")
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+              }
+            }
+            buildTypes.release.signingConfig = signingConfigs.release
+          }
+          GRADLE
+          chmod +x gradlew && ./gradlew assembleRelease --no-daemon
 
-      - name: 重命名 APK（带版本号）
-        run: |
-          if [ "$SIGNED" = "1" ]; then
-            mv android/app/build/outputs/apk/release/app-release.apk shinian-${{ github.event.inputs.release_tag }}-release.apk
-          else
-            mv android/app/build/outputs/apk/debug/app-debug.apk shinian-${{ github.event.inputs.release_tag }}-debug.apk
-          fi
-          ls -lh shinian-${{ github.event.inputs.release_tag }}-*.apk
-        env:
-          SIGNED: ${{ steps.sign.outputs.has_sign }}
-
-      - name: 上传 APK 到指定 Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          APK=$(ls shinian-${{ github.event.inputs.release_tag }}-*.apk | head -1)
-          gh release upload ${{ github.event.inputs.release_tag }} "$APK" \
-            --repo ${{ github.repository }} --clobber
+      - name: 上传 APK 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: shinian-${{ inputs.build_type }}-apk
+          path: android/app/build/outputs/apk/${{ inputs.build_type }}/**/*.apk
+          if-no-files-found: error
