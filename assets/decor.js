@@ -398,12 +398,16 @@
   }
 
   // 点击划过的流星 → 触发回调（由 app.js 设置为「展开许愿池并聚焦」）
+  // 修复（v0.7.6）：decorCanvas 位于 #sky 内（z-index:-1，处于前景内容之下），画布自身永远收不到点击，
+  // 原 canvas 级监听形同虚设。改为在 window 级监听，流星活动态时按视口坐标就近判定，命中即触发彩蛋。
+  // 仅当点击落在非交互控件（button/input/textarea/select/a）上才跳过，避免劫持表单/按钮等真实交互。
   function bindMeteorClick() {
-    if (!canvas) return;
-    canvas.addEventListener('click', function (ev) {
+    if (!w || !w.addEventListener) return;
+    w.addEventListener('click', function (ev) {
       if (!ambient || !ambient.list || !ambient.list.length) return;
-      var r = canvas.getBoundingClientRect();
-      var x = ev.clientX - r.left, y = ev.clientY - r.top;
+      if (ev.target && ev.target.closest &&
+          ev.target.closest('button, input, textarea, select, a')) return;
+      var x = ev.clientX, y = ev.clientY;          // 画布 inset:0 满视口，m.x/m.y 即视口坐标
       for (var i = 0; i < ambient.list.length; i++) {
         var m = ambient.list[i];
         var dx = m.x - x, dy = m.y - y;

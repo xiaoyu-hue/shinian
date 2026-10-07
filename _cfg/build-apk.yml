@@ -34,8 +34,8 @@ jobs:
       - name: 运行自动化测试
         run: npm test
 
-      - name: 构建 Web 资源
-        run: npm run build
+      # 零构建结构（index.html 双击即用，无打包器）：网页静态资源由下方 cap sync 直接拷贝，
+      # 无需、也不存在 npm run build 步骤；此前误写该步骤会导致 APK 流水线硬失败。
 
       - name: 添加 Android 平台
         run: npx cap add android

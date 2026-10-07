@@ -497,6 +497,14 @@
 
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      // 倒计时必须有合法日期（格式 YYYY-MM-DD + 真实日历）；否则静默入库会让 dayDiff 返回 NaN、渲染/排序错乱且无提示
+      if (!isValidDate(date.value)) {
+        date.setCustomValidity('请选择一个有效的日期');
+        if (date.reportValidity) date.reportValidity();
+        date.focus();
+        return;
+      }
+      date.setCustomValidity('');
       var items = load();
       if (editingId) {
         // 编辑模式：更新已有条目

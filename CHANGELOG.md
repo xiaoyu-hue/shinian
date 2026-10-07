@@ -62,6 +62,18 @@
 | **v0.7.3** | 2026-10-07 | 流星自定义间隔 + 开源致敬补全 | **流星可调**（用户提出：自定义时间，既能真实又能配合彩蛋）：设置新增「流星」区块——开关 + 出现间隔（真实 40–90s 随机 / 常见约 30s / 频繁约 12s / 自定义 5–300 秒），实际间隔在设定值上下 **±30% 抖动**（不机械、保住偶遇感又可预期）；进夜间后 **8–15 秒先来一颗**（保证「必遇一次」）；点击判定容差 50px→70px（便于点中「点流星→许愿池」彩蛋）；设置变更即时重排。**开源致敬与依赖补全**：新增「开发/测试/构建依赖」表（jsdom / Node / Capacitor / GitHub Actions / Gradle）、「数据与标准」表（Open-Meteo CC BY 4.0 / WMO 4677 / 城市坐标自整理）；补 v0.6.5 云彩初版参考（Cloudgen.js、javascript-animation-skills、canvas-design、Perlin/Simplex、Three.js 体积云评估后排除）；**修正两处文档不实**：① 误列 Noto Sans SC/Inter 为字体依赖——实际为纯系统字体栈且未引入任何 Web 字体；② 测试数量核正为 7 套 138 项。新增 `test_meteor.js` 13 项，全套 138 项全绿 | tag v0.7.3 |
 | **v0.7.4** | 2026-10-07 | 审查修复（稳健性 / 无障碍 / 容错） | 针对 2026-10-07 代码审查文档逐项核验后落地真实缺陷修复：**Q3** 补齐缺失 `</section>`（4 开 3 闭失衡，已配平）；**U1** 表单输入字号 <16px 升至 16px（规避 iOS Safari 聚焦时整页放大）；**D2** `cities.js` 订正维护说明为单一数据源内联、无外部生成器（历史上曾规划生成器但未引入）；**Q4** 备份导出判空补「纯心愿」场景（`!items.length && !wishes.length`）；**Q5** 天气刷新失败补 `.catch` 复位按钮为 `↻`；**Q6** `getSavedCity()` 校验本地存储损坏（lat/lon 须为 number、name 须为 string，否则回退默认城市，杜绝 `currentCity.lat` 为 undefined 抛 TypeError）；**Q7** `nowHours()` 对 `?t=` 时刻参数做边界校验（拒绝 `25:99` 等非法值）；**U2** 下拉触发器补 `aria-haspopup`/`aria-expanded` + `data-trigger` 联动（下拉展开/收起时读屏器可感知）。**审查文档中两项被核验为不准确、未采纳**：P0「测试不存在（ghost tests）」——7 套 138 项真实存在、CI 常跑，不写错误勘误；Q2「天气失败导致设置面板打不开」——`initSettings()` 先于天气拉取且包 `safe()`，不成立。**测试体系加固**：`test_clouds.js` 云量档位（同一云几何、只换乘率的多帧平均）与流速（最快层置中后测位移）断言改为确定性测量，消除偶发抖动；CI（`_cfg/build-apk.yml`）接入 `npm test`。全套 7 套 138 项全绿 | tag v0.7.4 |
 | **v0.7.5** | 2026-10-07 | 文档/注释订正（二次审查整改） | 针对第二次全方位代码审查发现的文档同步问题整改：**F1** `cities.js` 头部「数据源 = data/cities.json + tools/gen-cities.js 生成器」不实注释订正为单一数据源内联、无外部生成器（该死引用系 v0.7.4 误加的回归，连带订正 CHANGELOG 的 D2 表述）；**F2** 测试断言数 137→138（根因：v0.7.3 段误将计数「更正为 137」并被 README 继承，本次连同 README/CHANGELOG 共 4 处对齐实测值）；**F3** 本地副本 `index.html` 全引 `assets/*` 但源码在根、无法双击打开，以符号链接镜像 10 个被引用文件进 `assets/`，使本地 `file://` 可直接打开验证（发布态经 push.py 重映射自洽，非产品缺陷）；额外捕获并订正 `push.py` 提交说明与 Release 正文残留的旧 D2 错误表述，避免推送重新带错。运行时逻辑零改动，全套 7 套 138 项测试仍全绿 | tag v0.7.5 |
+| **v0.7.6** | 2026-10-07 | 第三次审查整改（4 缺陷 + 测试补齐） | 针对第三次全方位代码审查发现的真实缺陷修复：**C** `_cfg/build-apk.yml` 删除不存在的 `npm run build` 步骤（项目为零构建结构，该步骤会使 APK 流水线在「构建 Web 资源」处硬失败）；**B** `app.js` `initForm()` 新增 `isValidDate()` 日期合法性校验（此前新增/编辑倒数日未校验，空或非法日历日期静默入库致 `dayDiff=NaN`、渲染/排序错乱且无提示，现用原生 `setCustomValidity` 拦截并聚焦）；**A** `decor.js` 流星点击检测由位于 `z-index:-1` 背景层的 canvas 级监听改为 `window` 级监听（背景画布自身永远收不到点击，彩蛋此前实际失效；现按视口坐标就近判定、命中即展开许愿池，并排除 `button/input/textarea/select/a` 避免劫持真实交互）；**D** CHANGELOG v0.3.1 历史段「由 `tools/gen-cities.js` 生成」陈旧表述订正为与 F1 一致的单一数据源内联、无外部生成器（此前仅改了 `cities.js` 头部与 D2，漏改这段历史叙述，导致 CHANGELOG 内部自相矛盾）。**测试体系补齐**：新增 `test_form.js`（7 项：空日期拦截 / 非法日历日期拦截 / 合法日期入库 / 字段完整性 / 累加），全套 8 套 **145** 项全绿；修复 `test_form.js` 成功路径未显式 `process.exit` 导致的 `npm test` 链路挂起（decor.js 持久 `setInterval` 使 Node 事件循环不空、进程不自然退出，CI 亦会卡死）。**E** 新增 `.gitignore` 排除本地开发/调试残留（不影响 push.py 显式发布清单）。运行时 `localStorage` 数据结构零改动、零新增运行时依赖 | tag v0.7.6 |
+
+### v0.7.6 明细（第三次审查整改）
+
+> 范围：按第三次全方位代码审查清单逐项落地真实缺陷修复 + 补齐测试覆盖缺口。运行时逻辑仅做「补缺与纠偏」，不新增能力维度。
+
+- **C · CI 构建步骤硬失败（修复）**：`_cfg/build-apk.yml` 原在 `npm install → npm test` 之后执行 `npm run build`，但 `package.json` 仅含 `test` 脚本（项目为零构建 vanilla JS，无打包器，`cap sync` 直接拷贝静态资源）。APK 流水线一旦触发会在该步骤 `npm error Missing script: "build"` 硬失败、后续 `cap add/sync/签名/上传` 全部无法执行。已删除该步骤并加注释说明零构建事实。
+- **B · 倒数日表单缺日期校验（修复）**：`app.js` `initForm()` 新增/编辑两条路径此前直接 `date: date.value` 入库，未走 `isValidDate()`（愿望表单已校验）。空日期或 `2026-13-40` 这类非法日历日期会静默写入，`dayDiff()` 返回 `NaN`，渲染比较、排序、显示全部异常且无任何提示。现提交前校验，非法则 `setCustomValidity('请选择一个有效的日期')` + `reportValidity()` 原生提示并聚焦、不入库。
+- **A · 点流星→许愿池彩蛋失效（修复）**：根因是 `decorCanvas` 位于 `#sky`（`z-index:-1`，处于前景 `<main>` 内容之下），画布自身永远收不到点击，原 `canvas.addEventListener('click')` 形同虚设——尽管坐标/容差逻辑正确，用户却永远点不中。改为 `window` 级监听，流星活动态时按视口坐标就近判定（70px 容差不变），命中即触发 `onMeteorClick`（展开许愿池）；并排除交互控件以免误劫持表单/按钮。坐标空间无需换算：画布 `inset:0` 满视口，`m.x/m.y` 即视口坐标。
+- **D · CHANGELOG 历史段陈旧（修复）**：v0.3.1 明细段仍写「由 `tools/gen-cities.js` 从 `data/cities.json` 生成，二者需同步维护」，与 F1（单一数据源内联、无生成器）直接矛盾，使 CHANGELOG 内部自相矛盾。已订正为与 F1 一致表述。
+- **F7 · 测试覆盖缺口（补齐）**：新增 `test_form.js` 覆盖 B 的「非法日期拦截 + 合法入库 + 累加」，并修复其成功路径未 `process.exit` 导致的链路挂起。
+- **E · 工作副本游离文件（清理）**：新增 `.gitignore` 排除 `cloud-preview.html`、`patch_*.py`、`release_only.py`、`sm_debug*.html`、`sm_debug*.png`、`preview*.png`、`_t*.log`、`__pycache__` 等本地开发/调试残留（均不在 push.py 发布清单内，不影响线上产物）。
 
 ### v0.6.4 明细（启动开场动画重构）
 
@@ -316,7 +328,7 @@
 - **天气代码来源纠正**：装饰层与图标此前读「今天全天」的天气代码（`daily.weather_code[0]`），清晨下雨时可能显示全天均值对应的晴天。改为读「当前实况」（`current.weather_code`），并同步补齐 `current` 字段的响应校验
 - **亮度公式升级为 WCAG 标准**：玻璃配方亮/暗判定的相对亮度计算，由简化线性加权（无伽马校正）升级为 WCAG 标准公式（sRGB → 线性光，`pow((v+0.055)/1.055, 2.4)`），README「满足 WCAG AA」的表述自此有公式背书。阈值按等价换算由 0.42 校准为 0.19，全部天空锚点的新旧判定时机一致（误差 <2%），用户无感知
 - **帧率监测停止采样**：低帧率降级触发后，`requestAnimationFrame` 采样循环不再继续，避免低端设备持续白耗电。降级需连续 3 个采样窗口（6 秒）低于 30fps 才触发，误判锁定风险足够低
-- **`file://` 双击打开恢复全功能**：57 城列表由运行时 `fetch('data/cities.json')` 改为内联脚本 `assets/cities.js`（由 `tools/gen-cities.js` 从 `data/cities.json` 生成，二者需同步维护）。浏览器安全策略禁止 `file://` 页面 fetch 本地 JSON，内联是零构建方案下的唯一全功能路径；内联缺失时仍回退 fetch，兼容旧缓存
+- **`file://` 双击打开恢复全功能**：57 城列表由运行时 `fetch('data/cities.json')` 改为内联脚本 `assets/cities.js`（单一数据源、57 城直接内联、**无外部生成器**，规范做法为直接编辑 `SHINIAN_CITIES` 数组；历史上曾规划 `tools/gen-cities.js` 生成器但从未引入，v0.3 起为纯内联）。浏览器安全策略禁止 `file://` 页面 fetch 本地 JSON，内联是零构建方案下的唯一全功能路径；内联缺失时仍回退 fetch，兼容旧缓存
 
 **验证**
 浏览器实测：时钟 / 倒数日 / 城市下拉（57 城）/ 设置面板 / 导入校验（含坏日期用例）/ `?t=` 时刻模拟全部通过，控制台无报错。
