@@ -36,7 +36,7 @@ function build(hour, meteor, gap) {
     };
   };
   // jsdom 无 canvas：getContext 返回 null，decor 会优雅降级；不影响纯函数断言
-  w.eval(fs.readFileSync('decor.js', 'utf8'));
+  w.eval(fs.readFileSync('assets/decor.js', 'utf8'));
   if (meteor) w.document.documentElement.setAttribute('data-meteor', meteor);
   if (gap !== undefined) w.document.documentElement.setAttribute('data-meteor-gap', String(gap));
   return w.ShiNianDecor;

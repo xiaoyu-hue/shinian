@@ -17,7 +17,7 @@ global.window = {
   }
 };
 
-require('./notifications.js');
+require('./assets/notifications.js');
 const R = global.window.ShiNianRemind;
 
 function run(label, cfg, wishes, expectCount) {

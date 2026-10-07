@@ -9,8 +9,8 @@ function ok(label, cond, extra) {
 }
 
 const html = fs.readFileSync('index.html', 'utf8');
-const SCRIPTS = ['lunar.js', 'season.js', 'sky.js', 'weather.js', 'cities.js',
-                 'notifications.js', 'decor.js', 'app.js'];
+const SCRIPTS = ['assets/lunar.js', 'assets/season.js', 'assets/sky.js', 'assets/weather.js', 'assets/cities.js',
+                 'assets/notifications.js', 'assets/decor.js', 'assets/app.js'];
 
 function boot() {
   const dom = new JSDOM(html, {

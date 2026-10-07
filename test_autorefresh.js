@@ -36,8 +36,8 @@ function boot(query) {
       createRadialGradient() { return { addColorStop() {} }; },
     };
   };
-  const SCRIPTS = ['lunar.js', 'season.js', 'sky.js', 'weather.js', 'cities.js',
-                   'notifications.js', 'decor.js', 'assets/clouds.js', 'intro.js', 'app.js'];
+  const SCRIPTS = ['assets/lunar.js', 'assets/season.js', 'assets/sky.js', 'assets/weather.js', 'assets/cities.js',
+                   'assets/notifications.js', 'assets/decor.js', 'assets/clouds.js', 'assets/intro.js', 'assets/app.js'];
   SCRIPTS.forEach(function (f) {
     try { w.eval(fs.readFileSync(f, 'utf8')); }
     catch (e) { console.log('  [eval 异常 ' + f + ']', e.message); }

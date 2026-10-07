@@ -32,8 +32,8 @@ function bootFull() {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com/', pretendToBeVisual: true });
   const w = dom.window;
   w.HTMLCanvasElement.prototype.getContext = function () { return mockCtx(); };
-  const SCRIPTS = ['lunar.js', 'season.js', 'sky.js', 'weather.js', 'cities.js',
-                   'notifications.js', 'decor.js', 'assets/clouds.js', 'intro.js', 'app.js'];
+  const SCRIPTS = ['assets/lunar.js', 'assets/season.js', 'assets/sky.js', 'assets/weather.js', 'assets/cities.js',
+                   'assets/notifications.js', 'assets/decor.js', 'assets/clouds.js', 'assets/intro.js', 'assets/app.js'];
   let crashed = null;
   SCRIPTS.forEach(function (f) {
     try { w.eval(fs.readFileSync(f, 'utf8')); }
@@ -48,7 +48,7 @@ function bootIntroOnly() {
     { runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
   w.HTMLCanvasElement.prototype.getContext = function () { return mockCtx(); };
-  try { w.eval(fs.readFileSync('intro.js', 'utf8')); } catch (e) { console.log('  [intro eval]', e.message); }
+  try { w.eval(fs.readFileSync('assets/intro.js', 'utf8')); } catch (e) { console.log('  [intro eval]', e.message); }
   return w;
 }
 

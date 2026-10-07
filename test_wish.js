@@ -9,11 +9,11 @@ function ok(label, cond, extra) {
 }
 
 const html = fs.readFileSync('index.html', 'utf8');
-const appSrc = fs.readFileSync('app.js', 'utf8');
+const appSrc = fs.readFileSync('assets/app.js', 'utf8');
 
 // 按 index.html 的真实顺序加载全部脚本（否则 initCityPicker 等会失败）
-const SCRIPTS = ['lunar.js', 'season.js', 'sky.js', 'weather.js', 'cities.js',
-                 'notifications.js', 'decor.js', 'app.js'];
+const SCRIPTS = ['assets/lunar.js', 'assets/season.js', 'assets/sky.js', 'assets/weather.js', 'assets/cities.js',
+                 'assets/notifications.js', 'assets/decor.js', 'assets/app.js'];
 
 function boot() {
   const dom = new JSDOM(html, {
