@@ -55,7 +55,9 @@ jobs:
       # 直接用其自带的 sdkmanager 接受许可证并补齐编译依赖即可（已装的自动跳过）。
       - name: 配置 Android SDK 与许可证
         run: |
-          ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}
+          export ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}
+          # 同一步骤内必须 export 才生效（>> $GITHUB_PATH 仅对后续步骤生效）
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
