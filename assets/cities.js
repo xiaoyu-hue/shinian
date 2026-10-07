@@ -3,10 +3,10 @@
    ------------------------------------------------------------
    内联引入以支持 file:// 双击打开（浏览器安全策略禁止 file:// 页面 fetch 本地 JSON，v0.3.1 修复）。
 
-   维护方式（v0.7.4 统一）：城市数据源是 data/cities.json（含 name/pinyin/lat/lon），
-   本文件由 tools/gen-cities.js 根据其生成。**规范做法**是修改 data/cities.json 后运行生成器；
-   直接手改本文件的 SHINIAN_CITIES 数组亦可，但下次运行生成器会以 data/cities.json 为准覆盖本文件，
-   导致手动改动丢失——请勿同时维护两处。
+   维护方式（v0.7.4 修订）：本文件即**单一数据源**——57 城直接内联于此（name/pinyin/lat/lon），
+   不依赖任何外部 data/cities.json 或 tools/gen-cities.js 生成器（历史上曾规划该生成器，
+   但零构建目标下从未引入；v0.3 亦曾清理过相关死引用）。**规范做法**：直接编辑下方
+   SHINIAN_CITIES 数组即可，请勿另行维护不存在的 data/cities.json，以免改动丢失或产生误导。
    ============================================================ */
 
 var SHINIAN_CITIES = [
