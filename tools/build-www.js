@@ -40,27 +40,50 @@ const raw = order
 const bundled = esbuild.transformSync(raw, { minify: true, loader: 'js', target: 'es2018' }).code;
 fs.writeFileSync(path.join(out, 'assets', 'bundle.min.js'), bundled);
 
+// 1.5) 编译新代码分层 src/ -> shinian-core.min.js（TS，强类型，挂 window.ShiNianCore）
+//      使用 buildSync 以生成 IIFE 包裹（globalName=ShiNianCore），使 export 暴露为全局。
+let coreCode = '';
+const srcEntry = path.join(root, 'src', 'shinian-core.ts');
+if (fs.existsSync(srcEntry)) {
+  const res = esbuild.buildSync({
+    entryPoints: [srcEntry],
+    bundle: true,
+    format: 'iife',
+    globalName: 'ShiNianCore',
+    minify: true,
+    target: 'es2020',
+    write: false,
+  });
+  coreCode = res.outputFiles[0].text;
+  fs.writeFileSync(path.join(out, 'assets', 'shinian-core.min.js'), coreCode);
+} else {
+  console.warn('  [跳过] 未找到 src/shinian-core.ts，不生成 shinian-core.min.js');
+}
+
 // 2) 保留：样式 + 条件通知插件（APK 内才由 window.Capacitor 触发加载）
 fs.copyFileSync(path.join(root, 'assets', 'style.css'), path.join(out, 'assets', 'style.css'));
 fs.copyFileSync(path.join(root, 'assets', 'plugins', 'local-notifications.js'),
                 path.join(out, 'assets', 'plugins', 'local-notifications.js'));
 
-// 3) 生成 release 版 index.html：去掉散 script，改为引用单 bundle；保留条件注入块
+// 3) 生成 release 版 index.html：去掉散 script，改为引用 core + bundle；保留条件注入块
 let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 html = html.replace(/<script src="assets\/[^"]+\.js" defer><\/script>\s*/g, '');
 html = html.replace(/(<link rel="stylesheet" href="assets\/style\.css">)/,
-  '$1\n  <script src="assets/bundle.min.js" defer></script>');
+  '$1\n  <script src="assets/shinian-core.min.js" defer></script>\n  <script src="assets/bundle.min.js" defer></script>');
 fs.writeFileSync(path.join(out, 'index.html'), html);
 
-// 4) 自检：release index.html 应含 bundle 引用、且不再有散 assets/*.js 的 defer script
+// 4) 自检：release index.html 应含 core + bundle 引用、且不再有散 assets/*.js 的 defer script
 const hasBundle = /<script src="assets\/bundle\.min\.js" defer><\/script>/.test(html);
-// 残留散 script：带 defer 且不是 bundle 自身（bundle 自己会被正则命中，需排除）
+const hasCore = /<script src="assets\/shinian-core\.min\.js" defer><\/script>/.test(html);
+// 残留散 script：带 defer 且不是 core/bundle 自身（二者会被正则命中，需排除）
 const stray = (html.match(/<script src="assets\/[^"]+\.js" defer><\/script>/g) || [])
-  .filter(s => !/bundle\.min\.js/.test(s)).length;
+  .filter(s => !/shinian-core\.min\.js|bundle\.min\.js/.test(s)).length;
 console.log('build:release -> www/');
 console.log('  bundle.min.js:', bundled.length, 'bytes (原始拼接', raw.length, 'bytes)');
-console.log('  单 bundle 引用:', hasBundle ? 'OK' : '缺失!', '| 残留散 script:', stray);
-if (!hasBundle || stray > 0) {
+if (coreCode) console.log('  shinian-core.min.js:', coreCode.length, 'bytes (TS 编译)');
+console.log('  core 引用:', hasCore ? 'OK' : '缺失!', '| bundle 引用:', hasBundle ? 'OK' : '缺失!',
+            '| 残留散 script:', stray);
+if (!hasBundle || !hasCore || stray > 0) {
   console.error('  自检失败：release index.html 结构异常');
   process.exit(1);
 }

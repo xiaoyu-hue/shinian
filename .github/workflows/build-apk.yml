@@ -40,6 +40,9 @@ jobs:
       - name: 运行自动化测试（质量门）
         run: npm test
 
+      - name: 类型检查（ts-check 门，守护既有 vanilla + 新 TS 模块）
+        run: npm run typecheck
+
       - name: 发布态构建 (www/)
         run: npm run build:release
 
