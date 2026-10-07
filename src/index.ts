@@ -8,6 +8,7 @@
  */
 import * as core from './shinian-core';
 import * as crypto from './crypto-vault';
+import * as antiTamper from './anti-tamper';
 
 const ShiNianCore = {
   ...core.ShiNianCore,
@@ -22,6 +23,10 @@ const ShiNianCore = {
     unlockVault: crypto.unlockVault,
     PBKDF2_ITERATIONS: crypto.PBKDF2_ITERATIONS,
   },
+  antiTamper: {
+    detectThreats: antiTamper.detectThreats,
+    guard: antiTamper.guard,
+  },
 };
 
 if (typeof window !== 'undefined') {
@@ -31,3 +36,4 @@ if (typeof window !== 'undefined') {
 export { ShiNianCore };
 export * from './shinian-core';
 export * as crypto from './crypto-vault';
+export * as antiTamper from './anti-tamper';

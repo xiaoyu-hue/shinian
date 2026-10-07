@@ -22,6 +22,58 @@ const fs = require('fs');
 const path = require('path');
 const esbuild = require('esbuild');
 
+/**
+ * B3：javascript-obfuscator 混淆
+ * 关键约束（已验证）：
+ *   - renameGlobals:false —— 既有顶层 var（lunar/season/sky/SHINIAN_CITIES/notifications）
+ *     与 window.ShiNianCore 的 IIFE 全局名必须保留，否则加载即崩。
+ *   - 仅对「已 minify 的发布产物」做混淆，dev 模式零改动。
+ *   - 业务 bundle 关闭 console 输出（release 干净、且减少可被观察的日志）；
+ *     核心层（含 anti-tamper 安全告警）保留 console，使安全异常可见。
+ */
+const OBF_OPTIONS = {
+  compact: true,
+  controlFlowFlattening: true,
+  controlFlowFlatteningThreshold: 0.6,
+  deadCodeInjection: true,
+  deadCodeInjectionThreshold: 0.3,
+  debugProtection: false, // 开启会卡死合法调试，release 也过激，关闭
+  disableConsoleOutput: false,
+  identifierNamesGenerator: 'hexadecimal',
+  log: false,
+  numbersToExpressions: true,
+  renameGlobals: false, // 必须：保住全局符号
+  selfDefending: true,  // 防止格式化/重排后直接可读
+  simplify: true,
+  splitStrings: true,
+  splitStringsChunkLength: 16,
+  stringArray: true,
+  stringArrayCallsTransform: true,
+  stringArrayEncoding: ['base64'],
+  stringArrayThreshold: 0.6,
+  transformObjectKeys: true,
+  unicodeEscapeSequence: false,
+};
+
+let obfuscate;
+try {
+  obfuscate = require('javascript-obfuscator');
+} catch (e) {
+  console.warn('  [跳过混淆] 未安装 javascript-obfuscator，仅做 minify：', e.message);
+}
+
+function obfuscateFile(file) {
+  if (!obfuscate) return;
+  const before = fs.statSync(file).size;
+  const code = fs.readFileSync(file, 'utf8');
+  const out = obfuscate.obfuscate(code, OBF_OPTIONS).getObfuscatedCode();
+  fs.writeFileSync(file, out);
+  const after = fs.statSync(file).size;
+  const ratio = (after / before).toFixed(2);
+  console.log(`  混淆 ${path.basename(file)}: ${before} -> ${after} bytes (x${ratio})`);
+  return { before, after };
+}
+
 const root = process.cwd();
 const out = path.join(root, 'www');
 
@@ -60,6 +112,25 @@ if (fs.existsSync(srcEntry)) {
   console.warn('  [跳过] 未找到 src/shinian-core.ts，不生成 shinian-core.min.js');
 }
 
+// 1.6) B3 混淆：对两个发布产物做 javascript-obfuscator 混淆（保全局名、release 加固）
+const obfResults = [];
+obfResults.push(obfuscateFile(path.join(out, 'assets', 'bundle.min.js')));
+// 核心层保留 console，使 anti-tamper 安全告警可见；单独关闭 console 禁用
+if (obfuscate) {
+  const coreFile = path.join(out, 'assets', 'shinian-core.min.js');
+  if (fs.existsSync(coreFile)) {
+    const before = fs.statSync(coreFile).size;
+    const code = fs.readFileSync(coreFile, 'utf8');
+    const out2 = require('javascript-obfuscator')
+      .obfuscate(code, { ...OBF_OPTIONS, disableConsoleOutput: false })
+      .getObfuscatedCode();
+    fs.writeFileSync(coreFile, out2);
+    const after = fs.statSync(coreFile).size;
+    console.log(`  混淆 shinian-core.min.js: ${before} -> ${after} bytes (x${(after / before).toFixed(2)})`);
+    obfResults.push({ before, after });
+  }
+}
+
 // 2) 保留：样式 + 条件通知插件（APK 内才由 window.Capacitor 触发加载）
 fs.copyFileSync(path.join(root, 'assets', 'style.css'), path.join(out, 'assets', 'style.css'));
 fs.copyFileSync(path.join(root, 'assets', 'plugins', 'local-notifications.js'),
@@ -79,8 +150,8 @@ const hasCore = /<script src="assets\/shinian-core\.min\.js" defer><\/script>/.t
 const stray = (html.match(/<script src="assets\/[^"]+\.js" defer><\/script>/g) || [])
   .filter(s => !/shinian-core\.min\.js|bundle\.min\.js/.test(s)).length;
 console.log('build:release -> www/');
-console.log('  bundle.min.js:', bundled.length, 'bytes (原始拼接', raw.length, 'bytes)');
-if (coreCode) console.log('  shinian-core.min.js:', coreCode.length, 'bytes (TS 编译)');
+console.log('  bundle.min.js(混淆后):', fs.statSync(path.join(out, 'assets', 'bundle.min.js')).size, 'bytes (原始拼接', raw.length, 'bytes)');
+if (coreCode) console.log('  shinian-core.min.js(混淆后):', fs.statSync(path.join(out, 'assets', 'shinian-core.min.js')).size, 'bytes (TS 编译)');
 console.log('  core 引用:', hasCore ? 'OK' : '缺失!', '| bundle 引用:', hasBundle ? 'OK' : '缺失!',
             '| 残留散 script:', stray);
 if (!hasBundle || !hasCore || stray > 0) {
