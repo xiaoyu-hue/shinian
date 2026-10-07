@@ -26,7 +26,7 @@ function mockCtx() {
 
 const dom = new JSDOM('<!DOCTYPE html><body></body>', { runScripts: 'outside-only', pretendToBeVisual: true });
 const w = dom.window;
-w.SunCalc = require('../w59/assets/suncalc.js');   // 模拟浏览器全局（vendored UMD 在 Node 下走 module.exports）
+w.SunCalc = require('./assets/suncalc.js');   // 模拟浏览器全局（vendored UMD 在 Node 下走 module.exports）
 w.eval(fs.readFileSync('assets/sunmoon.js', 'utf8'));
 const SM = w.ShiNianSunMoon;
 SM.setCity(39.9042, 116.4074);   // 北京
