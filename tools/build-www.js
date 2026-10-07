@@ -43,7 +43,7 @@ fs.writeFileSync(path.join(out, 'assets', 'bundle.min.js'), bundled);
 // 1.5) 编译新代码分层 src/ -> shinian-core.min.js（TS，强类型，挂 window.ShiNianCore）
 //      使用 buildSync 以生成 IIFE 包裹（globalName=ShiNianCore），使 export 暴露为全局。
 let coreCode = '';
-const srcEntry = path.join(root, 'src', 'shinian-core.ts');
+const srcEntry = path.join(root, 'src', 'index.ts');
 if (fs.existsSync(srcEntry)) {
   const res = esbuild.buildSync({
     entryPoints: [srcEntry],

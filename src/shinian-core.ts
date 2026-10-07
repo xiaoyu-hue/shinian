@@ -40,15 +40,10 @@ export function randomHex(bytes: number): string {
   return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** 核心命名空间（同时挂到 window.ShiNianCore，供既有 app.js 调用）。 */
+/** 核心命名空间（在 src/index.ts 统一挂到 window.ShiNianCore）。 */
 export const ShiNianCore = {
   isValidDate,
   clamp,
   safeJsonParse,
   randomHex,
 };
-
-// 在浏览器 / WebView 中暴露到全局，便于既有 vanilla 代码按名调用。
-if (typeof window !== 'undefined') {
-  (window as unknown as { ShiNianCore: typeof ShiNianCore }).ShiNianCore = ShiNianCore;
-}
