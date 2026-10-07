@@ -554,16 +554,25 @@
   function getSavedCity() {
     try {
       var raw = localStorage.getItem(CITY_KEY);
-      return raw ? JSON.parse(raw) : null;
+      var c = raw ? JSON.parse(raw) : null;
+      // 容错：本地存储损坏（如空对象 / 字段缺失）时回退默认城市，
+      // 否则 currentCity.lat 为 undefined 会在天气请求里抛 TypeError
+      if (c && typeof c.lat === 'number' && typeof c.lon === 'number' && typeof c.name === 'string') {
+        return c;
+      }
+      return null;
     } catch(e){ return null; }
   }
 
+  var citySeq = 0;   // v0.7.4：城市切换序号守卫（防快切 A→B 时 A 的迟到响应覆盖 B）
   function saveCity(city) {
     currentCity = city;
     localStorage.setItem(CITY_KEY, JSON.stringify(city));
     document.getElementById('cityLabel').textContent = city.name;
-    // 拉取天气并通知 sky.js
+    var mySeq = ++citySeq;
+    // 拉取天气并通知 sky.js；序号不符则视为陈旧响应，直接丢弃
     ShiNianWeather.fetch(city).then(function(data){
+      if (mySeq !== citySeq) return;
       updateWeatherDisplay(data);
       window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: city, weather: data}}));
     });
@@ -594,6 +603,8 @@
   function openDrop(drop, bar, search) {
     closeSettings();          // 与设置面板互斥，同时只开一个
     drop.hidden = false;
+    var trig = document.getElementById(drop.getAttribute('data-trigger') || '');
+    if (trig) trig.setAttribute('aria-expanded', 'true');   // U2：读屏器感知展开状态
     bar.classList.add('open');
     renderCityList();
     search.focus();
@@ -605,6 +616,8 @@
   }
   function closeDrop(drop, bar, search) {
     if (drop.hidden) return;
+    var trig = document.getElementById(drop.getAttribute('data-trigger') || '');
+    if (trig) trig.setAttribute('aria-expanded', 'false');  // U2：读屏器感知收起状态
     bar.classList.remove('open');
     if (search) search.value = '';
     var anim = play(drop, [
@@ -710,6 +723,9 @@
       btn.textContent = '↻';
       updateWeatherDisplay(data);
       window.dispatchEvent(new CustomEvent('cityChange', {detail: {city: currentCity, weather: data}}));
+    }).catch(function () {
+      btn.textContent = '↻';
+      if (window.console) console.warn('[时念] 手动刷新天气失败（降级）');
     });
   }
 
@@ -949,6 +965,8 @@
   function closeSettings() {
     var drop = document.getElementById('settingsDrop');
     if (!drop || drop.hidden) return;
+    var st = document.getElementById('settingsBtn');
+    if (st) st.setAttribute('aria-expanded', 'false');   // U2：读屏器感知收起状态
     var a = play(drop, [
       { height: drop.scrollHeight + 'px', opacity: 1 },
       { height: '0px', opacity: 0 }
@@ -969,6 +987,8 @@
         var cd = document.getElementById('cityDrop');
         if (cd && !cd.hidden) closeDrop(cd, bar, document.getElementById('citySearch'));
         drop.hidden = false;
+        var st = document.getElementById('settingsBtn');
+        if (st) st.setAttribute('aria-expanded', 'true');   // U2：读屏器感知展开状态
         syncSettingsUI();
         var a = play(drop, [
           { height: '0px', opacity: 0 },
@@ -1080,9 +1100,12 @@
     // 导出 · 复制文本
     document.getElementById('exportCopy').addEventListener('click', function () {
       var items = load();
-      if (!items.length) { hint('还没有念想可以备份'); return; }
+      var wishes = loadWishes();
+      // v0.7.4：备份含念想与心愿两部分，仅当两者皆空才拦截
+      // （此前只看 items.length，导致「只有心愿、没有倒数日」的用户永远无法导出）
+      if (!items.length && !wishes.length) { hint('还没有念想或心愿可以备份'); return; }
       copyText(backupPayload()).then(function () {
-        hint('已复制 ' + items.length + ' 条念想的备份文本，粘到备忘录或聊天里就能存下来');
+        hint('已复制 ' + (items.length + wishes.length) + ' 条内容的备份文本，粘到备忘录或聊天里就能存下来');
         haptic(12);
       }).catch(function () {
         hint('复制失败，请改用「下载备份文件」');
@@ -1092,7 +1115,8 @@
     // 导出 · 下载文件
     document.getElementById('exportFile').addEventListener('click', function () {
       var items = load();
-      if (!items.length) { hint('还没有念想可以备份'); return; }
+      var wishes = loadWishes();
+      if (!items.length && !wishes.length) { hint('还没有念想或心愿可以备份'); return; }
       try {
         var blob = new Blob([backupPayload()], { type: 'application/json' });
         var url = URL.createObjectURL(blob);

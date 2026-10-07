@@ -263,7 +263,7 @@ main {
 /* 设置面板内的输入控件（提醒间隔/时刻） */
 .set-input { width: 64px; min-height: 32px; padding: 4px 8px; text-align: center;
   border: 1px solid var(--hairline); border-radius: 8px; background: rgba(120,140,160,.12);
-  color: var(--text); font: 14px/1 inherit; font-family: inherit; }
+  color: var(--text); font: 16px/1.4 inherit; font-family: inherit; }
 .set-input.narrow { width: 44px; }
 .set-input-group { display: inline-flex; align-items: center; gap: 6px; color: var(--text-faint); }
 
@@ -436,10 +436,10 @@ main {
 .wish-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .wish-form input[type="text"] { flex: 1 1 160px; min-height: 40px; padding: 6px 10px;
   border: 1px solid var(--hairline); border-radius: 8px; background: rgba(120,140,160,.12);
-  color: var(--text); font: 14px/1 inherit; font-family: inherit; }
+  color: var(--text); font: 16px/1.4 inherit; font-family: inherit; }
 .wish-form input[type="date"] { min-height: 40px; padding: 6px 8px;
   border: 1px solid var(--hairline); border-radius: 8px; background: rgba(120,140,160,.12);
-  color: var(--text); font: 13px/1 inherit; font-family: inherit; }
+  color: var(--text); font: 16px/1.4 inherit; font-family: inherit; }
 .wish-list { list-style: none; margin: 0; padding: 0; }
 .wish-item { display: flex; align-items: center; gap: 10px; min-height: 44px;
   padding: 6px 0; border-bottom: 1px solid var(--hairline); }

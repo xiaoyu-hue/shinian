@@ -82,16 +82,18 @@
 
     <!-- 城市选择 -->
     <div class="city-bar" id="cityBar">
-      <button type="button" class="city-btn" id="cityBtn" aria-label="选择城市">
+      <button type="button" class="city-btn" id="cityBtn" aria-label="选择城市"
+              aria-haspopup="true" aria-expanded="false">
         <span class="city-pin">📍</span>
         <span class="city-label" id="cityLabel">北京</span>
         <span class="city-chev">▾</span>
       </button>
       <button type="button" class="refresh-btn" id="refreshWeather" aria-label="刷新天气">↻</button>
-      <button type="button" class="settings-btn" id="settingsBtn" aria-label="设置与数据">⚙</button>
+      <button type="button" class="settings-btn" id="settingsBtn" aria-label="设置与数据"
+              aria-haspopup="true" aria-expanded="false">⚙</button>
 
       <!-- 设置与数据面板 -->
-      <div class="settings-drop" id="settingsDrop" hidden>
+      <div class="settings-drop" id="settingsDrop" hidden data-trigger="settingsBtn">
         <div class="set-block">
           <div class="set-label">玻璃配方</div>
           <div class="set-seg" id="recipeSeg" role="group" aria-label="玻璃配方">
@@ -196,7 +198,7 @@
         </div>
       </div>
 
-      <div class="city-drop" id="cityDrop" hidden>
+      <div class="city-drop" id="cityDrop" hidden data-trigger="cityBtn">
         <input type="text" class="city-search" id="citySearch" placeholder="搜索城市…" autocomplete="off">
         <ul class="city-list" id="cityList"></ul>
       </div>
@@ -224,6 +226,7 @@
       <div id="cdEmpty" class="glass card empty" hidden>
         还没有念想。挑一个日子——生日、约定，或者任何你在等的东西。
       </div>
+    </section>
     <!-- 许愿池（v0.5.9）：备忘录式心愿清单 -->
     <section class="wishes" aria-label="许愿池">
       <h2 class="section-title">许愿池</h2>

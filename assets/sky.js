@@ -108,11 +108,12 @@
   }
 
   function nowHours() {
-    // 调试参数 ?t=HH:MM
+    // 调试参数 ?t=HH:MM（v0.7.4：校验有效性，拒绝 ?t=25:99 / ?t=12:99 等非法时刻）
     var q = new URLSearchParams(location.search).get('t');
     if (q && /^\d{1,2}:\d{2}$/.test(q)) {
       var p = q.split(':');
-      return (+p[0]) + (+p[1]) / 60;
+      var hh = +p[0], mm = +p[1];
+      if (hh >= 0 && hh < 24 && mm >= 0 && mm < 60) return hh + mm / 60;
     }
     var d = new Date();
     return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;

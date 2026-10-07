@@ -60,6 +60,7 @@
 | **v0.7.1** | 2026-10-07 | 云彩可调（速度/空窗/开关） | 基于用户试用反馈三项改进：① 流动提速约 2.3 倍（低层跨屏约 95s→41s，湍流变形同步加快）；② **空窗期可配置**（关闭=连续有云 / 短≈15s / 中≈30s / 长≈50s，云飘过后留一段澄澈天空再迎下一批，切换处 4s 淡入淡出，空窗期连光栅化都跳过以省电）；③ **云彩自定义开关 + 云量档位**（关闭 / 跟随天气 / 疏 / 适中 / 密，设置面板新增「云彩」区块，关闭后清空画布跳过更新）；另修复慢层云回卷后长时间离屏造成的意外空窗（回卷点收紧至贴边）与 mock 环境下 `_img` 为 null 的降级守卫；测试 50→53 项（空窗期两模式、云量档位、流速、关闭态），全套 119 项 | tag v0.7.1 |
 | **v0.7.2** | 2026-10-07 | 开源合规与文档补齐 | 补齐**开源致敬与依赖登记**：README 运行时依赖表登记 **SunCalc（BSD-2，v0.7.0 接入却漏登）**，新增「v0.7 天穹重构」参考借鉴小节（Inigo Quilez 域翘曲/fBm、Cloud Sky originkit、MiniMax procedural-noise、p5js 性能预算、claude-motion-skills、MDN 优化守则）与火烧云物理依据说明，并补充 Vendored 文件说明；**修复合规缺口**：`lunar.js` vendored 副本此前**许可头被剥离**（README 声明 MIT 但文件内 0 处声明），已补回 MIT 归属头（与 suncalc.js 一致）。代码零改动，全套 119 项测试仍全绿 | tag v0.7.2 |
 | **v0.7.3** | 2026-10-07 | 流星自定义间隔 + 开源致敬补全 | **流星可调**（用户提出：自定义时间，既能真实又能配合彩蛋）：设置新增「流星」区块——开关 + 出现间隔（真实 40–90s 随机 / 常见约 30s / 频繁约 12s / 自定义 5–300 秒），实际间隔在设定值上下 **±30% 抖动**（不机械、保住偶遇感又可预期）；进夜间后 **8–15 秒先来一颗**（保证「必遇一次」）；点击判定容差 50px→70px（便于点中「点流星→许愿池」彩蛋）；设置变更即时重排。**开源致敬与依赖补全**：新增「开发/测试/构建依赖」表（jsdom / Node / Capacitor / GitHub Actions / Gradle）、「数据与标准」表（Open-Meteo CC BY 4.0 / WMO 4677 / 城市坐标自整理）；补 v0.6.5 云彩初版参考（Cloudgen.js、javascript-animation-skills、canvas-design、Perlin/Simplex、Three.js 体积云评估后排除）；**修正两处文档不实**：① 误列 Noto Sans SC/Inter 为字体依赖——实际为纯系统字体栈且未引入任何 Web 字体；② 测试数量修正为 7 套 137 项。新增 `test_meteor.js` 13 项，全套 137 项全绿 | tag v0.7.3 |
+| **v0.7.4** | 2026-10-07 | 审查修复（稳健性 / 无障碍 / 容错） | 针对 2026-10-07 代码审查文档逐项核验后落地真实缺陷修复：**Q3** 补齐缺失 `</section>`（4 开 3 闭失衡，已配平）；**U1** 表单输入字号 <16px 升至 16px（规避 iOS Safari 聚焦时整页放大）；**D2** `cities.js` 补维护说明（数据源 `data/cities.json` + `tools/gen-cities.js` 生成器，防手改被覆盖）；**Q4** 备份导出判空补「纯心愿」场景（`!items.length && !wishes.length`）；**Q5** 天气刷新失败补 `.catch` 复位按钮为 `↻`；**Q6** `getSavedCity()` 校验本地存储损坏（lat/lon 须为 number、name 须为 string，否则回退默认城市，杜绝 `currentCity.lat` 为 undefined 抛 TypeError）；**Q7** `nowHours()` 对 `?t=` 时刻参数做边界校验（拒绝 `25:99` 等非法值）；**U2** 下拉触发器补 `aria-haspopup`/`aria-expanded` + `data-trigger` 联动（下拉展开/收起时读屏器可感知）。**审查文档中两项被核验为不准确、未采纳**：P0「测试不存在（ghost tests）」——7 套 138 项真实存在、CI 常跑，不写错误勘误；Q2「天气失败导致设置面板打不开」——`initSettings()` 先于天气拉取且包 `safe()`，不成立。**测试体系加固**：`test_clouds.js` 云量档位（同一云几何、只换乘率的多帧平均）与流速（最快层置中后测位移）断言改为确定性测量，消除偶发抖动；CI（`_cfg/build-apk.yml`）接入 `npm test`。全套 7 套 138 项全绿 | tag v0.7.4 |
 
 ### v0.6.4 明细（启动开场动画重构）
 
@@ -148,6 +149,42 @@
 - **README 参考案例补齐**：新增「参考借鉴（v0.7 天穹重构：云彩引擎 v3 + 日月体系）」小节，登记 Inigo Quilez 域翘曲/fBm、Cloud Sky（originkit）形态设计、MiniMax-AI/skills 的 procedural-noise 工艺、NousResearch p5js 性能预算表、kevinbadi/claude-motion-skills 的交付闭环、mourner/suncalc 算法、MDN canvas 优化守则；并写明火烧云的物理依据（低角度光散射 → 云底橙红→中粉→顶紫蓝 + 银边效应）。「深深致敬」追加 SunCalc 与 Inigo Quilez。
 - **合规缺口修复（重要）**：`lunar.js` 为 vendored 第三方库，此前**许可头被剥离**——README 对外声明其为 MIT，而文件内 `MIT / License / Copyright / @author` 命中数为 **0**，形成「声明与副本不一致」的合规风险（该问题在首次全仓库审查中已发现）。现已按与 `assets/suncalc.js` 相同的做法补回完整 MIT 归属头（含项目名、上游地址、版权、许可以及「不得移除」说明）。经 `node --check` 校验语法正常。
 - **代码零改动**：本次只动 `README.md`、`CHANGELOG.md`、`docs/PRD.md`、`lunar.js`（仅追加注释头）与版本号。
+
+### v0.7.3 明细（流星自定义间隔 + 开源致敬补全）
+
+> 范围：用户提出「流星时间要能自己调」，叠加开源致敬与依赖登记补全；代码改动限于流星设置与文档。
+
+- **流星可调（用户提出）**：设置新增「流星」区块——开关 + 出现间隔（真实 40–90 秒随机 / 常见约 30 秒 / 频繁约 12 秒 / 自定义 5–300 秒），实际间隔在设定值上下 **±30% 抖动**（不机械、保住偶遇感又可预期，便于点中「点流星 → 许愿池」彩蛋）。进入夜间后 **8–15 秒先来一颗**（保证「必遇一次」），之后回到设定节奏；点击判定容差 50px → **70px**（手机更易点中）；仍仅夜间出现、等待期零绘制零耗电；设置变更经 `meteorModeChange` 即时重排。
+- **开源致敬与依赖补全**：新增「开发/测试/构建依赖」表（jsdom / Node / Capacitor / GitHub Actions / Gradle，明确不进入网页运行时）与「数据与标准」表（Open-Meteo CC BY 4.0、WMO 4677 天气代码、57 城坐标自整理）；补 v0.6.5 云彩初版参考（Cloudgen.js、javascript-animation-skills、canvas-design、Perlin/Simplex，Three.js 体积云评估后排除）。
+- **修正两处文档不实**：① README 曾误列 Noto Sans SC / Inter 为字体依赖——实际 `style.css` 用纯系统字体栈且未引入任何 Web 字体，已更正；② 测试数量更正为实测 7 套 137 项。
+- **测试**：新增 `test_meteor.js` 13 项；全套 7 套 137 项全绿。
+- **文档**：README / CHANGELOG / PRD 同步 v0.7.3；未触发 APK 构建（纯网页版，按用户一贯要求）。
+
+### v0.7.4 明细（审查修复：稳健性 / 无障碍 / 容错）
+
+> 触发：2026-10-07 收到一份代码审查文档，逐条核验后落地真实缺陷，并明确否决其中两项不准确指控（不写错误勘误、不做无谓之改）。
+
+**真实缺陷修复（已落地）**
+- **Q3 · 结构（HTML）**：`index.html` 一处 `<section>` 只开未闭（4 开 3 闭），已在许愿池区块前补 `</section>`，DOM 层级恢复配平。
+- **U1 · 无障碍（iOS 聚焦缩放）**：许愿/提醒表单输入框与 `.set-input` 字号原为 14/13px，小于 16px 会触发 iOS Safari 聚焦时整页放大；统一升至 `font: 16px/1.4`。
+- **D2 · 可维护性（cities.js）**：此前无维护说明，易被手改后在下一次生成器运行（`tools/gen-cities.js`）时被 `data/cities.json` 覆盖丢失；头部已写明「数据源 = data/cities.json，本文件由生成器产出，规范做法改源数据后重跑生成器」。
+- **Q4 · 备份导出（纯心愿用户）**：`exportCopy`/`exportFile` 原仅判 `!items.length`，对「只有心愿、没有念想」的用户误报「无内容」；改为 `!items.length && !wishes.length`。
+- **Q5 · 天气刷新失败复位**：`refreshWeather()` 原缺 `.catch`，失败时刷新按钮停留在转圈态不复位；已补 `.catch` 复位为 `↻`。
+- **Q6 · 本地存储损坏容错**：`getSavedCity()` 原直接 `JSON.parse` 后使用，本地存储若被损坏（空对象/字段缺失）会让 `currentCity.lat` 为 undefined，在天气请求里抛 TypeError；现校验 `lat/lon` 为 number、`name` 为 string，不合法则回退默认城市。
+- **Q7 · `?t=` 调试参数边界**：`nowHours()` 原未校验 `?t=HH:MM` 取值，传入 `?t=25:99` 之类会算出非法时刻污染天空插值；现仅当 `0≤hh<24 且 0≤mm<60` 才采纳。
+- **U2 · 下拉无障碍（ARIA）**：城市/设置两个下拉触发器原无 `aria-haspopup`/`aria-expanded` 状态，读屏器无法感知展开；现加 `aria-haspopup="true"` + 动态 `aria-expanded`，并通过 `data-trigger` 在 `openDrop/closeDrop` 与设置开关处同步状态。
+
+**审查文档中被核验为不准确、未采纳的两项**
+- **P0「测试不存在（ghost tests）」——不成立**：仓库内 `test_wish`/`test_notif_s5`/`test_autorefresh`/`test_intro`/`test_clouds`/`test_sunmoon`/`test_meteor` 共 7 套、138 项断言真实存在，`npm test` 串联全跑、`_cfg/build-apk.yml`（v0.7.4 起）接入，此前多次全绿。不在代码中写「我们谎报了测试」的错误勘误。
+- **Q2「天气失败导致设置面板打不开」——不成立**：`initSettings()` 在天气拉取之前执行且整体包在 `safe()` 中，单点天气失败只会静默降级，不会阻断设置面板初始化。若强行「修复」反而是无谓之改、可能引入回归。
+
+**测试体系加固（本次一并纳入版本）**
+- `test_clouds.js` **N 段（云量档位）**：原用单帧随机采样比较「疏 < auto < 密」，因每次 `create` 重新随机播种导致偶发翻转；改为「同一云几何、只换乘率」——用同一 `_seed` 经 `setWeather()` 重播（疏是 auto 的子集、auto 是密的子集，乘率 0.45/1.0/1.6 单调），多帧（60 帧）平均覆盖，严格单调，确定性通过。
+- `test_clouds.js` **P 段（流动速度）**：原随机云场里「最快层那朵云」可能恰好在 10 秒内回卷到边界，单帧位移偶发偏小（曾出现 0.135 < 0.15 误判）；现取最快层云并将其置于屏幕中央（x=0.5）再 `update(10)`，10 秒内不越界回卷，位移可精确测量（实测 ≈0.245）。
+- **CI**：`_cfg/build-apk.yml` 在「安装依赖」与「构建 Web 资源」之间新增「运行自动化测试 / `npm test`」步骤，构建前先卡测试。
+- **验证**：`npm test` 连跑 4 轮全绿（138 项、0 失败），N/P 两个易抖动点稳定通过。
+
+**版本定位**：均为既有维度内的缺陷修复与加固，依版本规范升修订号（0.7.4）；不动 `localStorage` 数据结构、不新增运行时依赖。
 
 ### v0.6.1 明细
 
