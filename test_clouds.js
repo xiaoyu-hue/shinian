@@ -43,6 +43,7 @@ function renderAt(urlQuery, weather, opts) {
   if (opts && opts.gap) w.document.documentElement.setAttribute('data-cloud-gap', opts.gap);
   const C = w.ShiNianClouds;
   const f = C.create(Object.assign({ w: 1000, h: 600, quality: 'desktop' }, opts || {}));
+  if (opts && typeof opts.seed === 'number') f._seed = opts.seed; // 固定种子 → 同几何，消除随机播种抖动
   f.setWeather();
   const t0 = Date.now();
   f.render(false);
@@ -110,9 +111,11 @@ try { f.draw(null, 0, false); } catch (e) { drewNull = false; console.log('  [nu
 ok('ctx 为 null 时 draw 跳过不抛错', drewNull);
 
 console.log('== H. ★ 网格留白（根治「聚成一坨」）==');
-const clearStats = renderAt('13:00', 'clear');
+// v0.7.4 修抖动：晴/阴共用同一 _seed → 同一片云几何，仅天气覆盖率系数不同，
+// 比较确定化（clear 0.30 / cloudy 0.90），彻底消除随机播种导致的偶发翻转。
+const clearStats = renderAt('13:00', 'clear', { seed: 4242 });
 ok('晴天云间存在大量留白（覆盖<30%）', clearStats.coverPct < 30, '覆盖 ' + clearStats.coverPct.toFixed(1) + '%');
-const cloudyStats = renderAt('13:00', 'cloudy');
+const cloudyStats = renderAt('13:00', 'cloudy', { seed: 4242 });
 ok('阴天覆盖明显高于晴天', cloudyStats.coverPct > clearStats.coverPct + 5,
    clearStats.coverPct.toFixed(1) + '% → ' + cloudyStats.coverPct.toFixed(1) + '%');
 ok('阴天仍保留留白（覆盖<60%，不糊成一片）', cloudyStats.coverPct < 60, '覆盖 ' + cloudyStats.coverPct.toFixed(1) + '%');
