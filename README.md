@@ -1,6 +1,6 @@
 # 时念 · ShiNian
 
-> 当前版本 **v1.1.3** · [版本历史与规范](./CHANGELOG.md) · [主站](https://shinian520.pages.dev/)
+> 当前版本 **v1.1.3** · [版本历史与规范](./CHANGELOG.md) · [架构文档](./docs/ARCHITECTURE.md) · [安全自审报告](./docs/SECURITY-AUDIT-v1.0.0.md) · [主站](https://shinian520.pages.dev/)
 
 > 一款装在手机里的「活着的窗景」时间工具——天空随真实时刻、四季与天气流动，
 > 时钟、倒数日、提醒以液态玻璃卡片悬浮其上。**天空是主角，玻璃是舞台。**
