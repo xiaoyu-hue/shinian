@@ -60,3 +60,23 @@
 4. 收尾同步文档（README / CHANGELOG 对齐混合架构与 v1.0.0），届时再单独征求公开发布确认。
 
 > 本路线图即 v1.0.0 实施基准；未启动时一行产品代码都不写，待你审完拍板后按 A→B 重拆为可执行小步逐一交付。
+
+## 6. 执行状态（截至 2026-10-08 · 本地完成、待推送）
+
+| 编号 | 状态 | 落地说明 |
+|---|---|---|
+| A1 | ✅ | `capacitor.config.json`（`appId=com.shinian.app`、`webDir=www`）+ `@capacitor/core`/`@capacitor/android`/`@capacitor/cli` 依赖就位 |
+| A2 | ✅ | `npm run build:release`（esbuild 编译 `src/` → `www/assets/shinian-core.min.js` + 混淆 `bundle.min.js`），CI 已接 |
+| A3 | ✅ | `src/secure-store.ts` 统一加密存储层 + `assets/app.js` 的 `Store` 桥接（release 加密 / dev 明文降级） |
+| A4 | ✅ | 新模块 TS 化 + `npm run typecheck`（`tsc --noEmit`）质量门通过 |
+| A5 | ✅ | 分层仅约束新增代码（`src/`），旧核心视觉算法原样保留 |
+| B1 | ✅ | 主密码加密保险库：`crypto-vault.ts`（AES-GCM-256 + PBKDF2 21 万轮）、`secure-store.ts`（DEK 不落盘、lock/unlock/changePassword） |
+| B2 | ✅ | 三重解锁：主密码 + 生物锁（`@bytetrade/capacitor-native-biometric@6.0.5`，经系统 Keystore 封装 DEK）+ 应用锁（回前台重验）；Web 降级密码-only |
+| B3 | 🟡 | 发布态 `javascript-obfuscator` 混淆 + `anti-tamper.ts` WebView 层自检（非原生/WebDriver/DevTools/debugger）已落地；**原生级 Root/Frida/重打包检测（Free-RASP）待后续接入** |
+| B4 | ✅ | `_cfg/build-apk.yml` 注入 `allowBackup=false`/`debuggable=false`/禁明文/`network_security_config`（拒用户证书）/`WebView.EnableSafeBrowsing`；CSP 收紧；签名出包保留 |
+| B5 | ✅ | `_docs/SECURITY-AUDIT-v1.0.0.md`（OWASP MASVS v2.1 八类逐条对照 + 残余风险） |
+
+> **B2 插件选型说明**：路线图中写的是 `@capgo/capacitor-native-biometric`，落地时改用了 **`@bytetrade/capacitor-native-biometric@6.0.5`**——因其 peer 依赖 `@capacitor/core ^6`，与本项目 Capacitor 6 主版本精确对齐（`@capgo` 最新为 v8，需 Capacitor 8）。API 一致（`isAvailable/verifyIdentity/setCredentials/getCredentials`），行为无差异。
+>
+> **收尾**：代码 + 文档已全部本地完成并通过 `npm test`（145+）/ `typecheck` / `build:release`；版本号 `1.0.0-alpha.5` → `1.0.0`；待你提供 GitHub Token 后统一推送并打 `v1.0.0` tag + Release（含签名 APK 经 CI 出包）。
+
