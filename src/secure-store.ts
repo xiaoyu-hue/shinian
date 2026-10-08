@@ -37,6 +37,34 @@ let dek: Uint8Array | null = null;
 let bioKEK: Uint8Array | null = null; // 会话内缓存（用于改密时重封装，不落盘）
 const cache = new Map<string, unknown>();
 
+/**
+ * v1.1.1（Q4）：落盘写队列。set() 的异步加密落盘按调用顺序串行执行，
+ * 杜绝「两次快速写同一键时，旧值后完成覆盖新值」的乱序覆盖。
+ * 单次写失败不断队列（失败仍会向该次调用方抛出，见 persist）。
+ */
+let writeQueue: Promise<void> = Promise.resolve();
+
+/** v1.1.1（Q3）：扫描 localStorage 中所有 `<key>__enc` 密文键。
+ *  与 KNOWN_KEYS 取并集参与 prime / changePassword，
+ *  防止「未来新增业务键不在 KNOWN_KEYS 里」时改密后数据不可解（自愈式键发现）。 */
+function encKeysInStorage(): string[] {
+  const out: string[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.endsWith(ENC_SUFFIX)) out.push(k.slice(0, -ENC_SUFFIX.length));
+    }
+  } catch { /* localStorage 不可用时退化为 KNOWN_KEYS */ }
+  return out;
+}
+
+/** 实际持有加密数据的全部键（KNOWN_KEYS ∪ 存储中发现的密文键）。 */
+export function dataKeys(): string[] {
+  const set = new Set<string>(KNOWN_KEYS);
+  for (const k of encKeysInStorage()) set.add(k);
+  return Array.from(set);
+}
+
 function loadEnvelope(): VaultEnvelope | null {
   try {
     const raw = localStorage.getItem(VAULT_KEY);
@@ -83,7 +111,8 @@ export function isReady(): boolean {
 async function prime(): Promise<void> {
   cache.clear();
   if (!dek) return;
-  for (const k of KNOWN_KEYS) {
+  // v1.1.1（Q3）：遍历 KNOWN_KEYS ∪ 存储中实际存在的密文键（自愈式键发现）
+  for (const k of dataKeys()) {
     const raw = localStorage.getItem(k + ENC_SUFFIX);
     if (!raw) continue;
     try {
@@ -144,23 +173,23 @@ export function get(key: string): unknown {
   return cache.has(key) ? cache.get(key) : null;
 }
 
-/** 写入（同步更新 cache + 异步落盘）；未解锁抛错（拒绝在锁态写入）。 */
+/** 写入（同步更新 cache + 队列化异步落盘）；未解锁抛错（拒绝在锁态写入）。
+ *  v1.1.1（Q1）：persist 失败会向调用方抛出（原先静默吞掉——迁移场景依赖该信号
+ *  决定是否删除明文副本，吞错会导致「明文已删、密文未落」的数据丢失）。 */
 export async function set(key: string, value: unknown): Promise<void> {
   if (!dek) throw new Error('ShiNian.SecureStore: 保险库未解锁，拒绝写入');
   cache.set(key, value);
   await persist(key, value);
 }
 
-async function persist(key: string, value: unknown): Promise<void> {
-  try {
+/** 队列化落盘：按调用顺序串行执行（Q4），失败抛给该次调用方（Q1）。 */
+function persist(key: string, value: unknown): Promise<void> {
+  const task = writeQueue.then(async () => {
     const blob = await aesEncrypt(dek as Uint8Array, JSON.stringify(value));
     localStorage.setItem(key + ENC_SUFFIX, JSON.stringify(blob));
-  } catch (e) {
-    if (typeof window !== 'undefined' && window.console) {
-      // eslint-disable-next-line no-console
-      console.warn('[时念·安全] 持久化失败（已跳过）:', e);
-    }
-  }
+  });
+  writeQueue = task.catch(() => { /* 吞掉以保持队列存活，错误已由 task 本身传播 */ });
+  return task;
 }
 
 /**
@@ -192,12 +221,13 @@ export async function changePassword(oldPwd: string, newPwd: string): Promise<vo
   const env = loadEnvelope();
   if (!env) throw new Error('ShiNian.SecureStore: 保险库未初始化');
   dek = await unlockVault(oldPwd, env); // 验证旧密码并还原 DEK
+  const keys = dataKeys(); // v1.1.1（Q3）：并集，防止新业务键在改密后成不可解密文
   const snapshot: Record<string, unknown> = {};
-  for (const k of KNOWN_KEYS) snapshot[k] = get(k); // 用旧 DEK 解密到明文
+  for (const k of keys) snapshot[k] = get(k); // 用旧 DEK 解密到明文
   const { envelope: newEnv, dek: newDek } = await createVault(newPwd);
   persistEnvelope(newEnv);
   dek = newDek; // 切到新 vault 的 DEK
-  for (const k of KNOWN_KEYS) {
+  for (const k of keys) {
     if (snapshot[k] !== null && snapshot[k] !== undefined) await set(k, snapshot[k]); // 用新 DEK 重加密
   }
   await reWrapBio(newDek); // B2：新 DEK 重新封装生物锁
@@ -246,4 +276,5 @@ export const SecureStore = {
   set,
   changePassword,
   KNOWN_KEYS,
+  dataKeys, // v1.1.1（Q3）：实际持有加密数据的全键集（KNOWN_KEYS ∪ 存储密文键）
 };

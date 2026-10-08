@@ -25,7 +25,15 @@
     function set(key, val) {
       var s = ss();
       if (s && s.isReady && s.isReady()) {
-        try { s.set(key, val); return; } catch (e) { if (window.console) console.warn('[时念] 加密存储失败（降级明文）:', e); }
+        // v1.1.1（Q1）：加密层就绪时绝不回写明文（隐私契约）——原先 catch 里
+        // "降级明文"会把用户明确要求加密的数据偷偷写成明文。落盘失败仅告警，
+        // 内存 cache 仍是准值；队列化落盘（Q4）保证多键写入不乱序。
+        try {
+          Promise.resolve(s.set(key, val)).catch(function (e) {
+            if (window.console) console.warn('[时念] 加密落盘失败（内存缓存保留）:', e);
+          });
+        } catch (e) { if (window.console) console.warn('[时念] 加密写入失败:', e); }
+        return;
       }
       try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { if (window.console) console.warn('[时念] 保存失败（已跳过）:', e); }
     }
@@ -1678,30 +1686,44 @@
       if (pendingEnableEnc) {
         pendingEnableEnc = false;
         localStorage.setItem('shinian.enc.enabled', '1');
-        migratePlaintextToEncrypted();
-        syncSettingsUI();
-        hint('已开启加密存储，本地数据已加密');
+        // v1.1.1（Q1）：迁移改为 await——全部键确认落盘才提示成功；失败则如实告知并保留明文
+        migratePlaintextToEncrypted().then(function (done) {
+          if (done) { hint('已开启加密存储，本地数据已加密'); }
+          else { hint('加密已开启，但部分数据迁移失败（明文已保留，可稍后重试）'); }
+          syncSettingsUI();
+        });
         haptic(12);
       }
     }
 
     // 开启加密存储：把现有明文数据改写为加密（dek 已在内存，isReady 为真），并删除明文副本
-    function migratePlaintextToEncrypted() {
-      var S = SS(); if (!S || !S.isReady()) return;
-      S.KNOWN_KEYS.forEach(function (k) {
+    // v1.1.1（Q1）：逐键 await 落盘确认后再删明文——原先 S.set() 异步落盘未等待、
+    // persist 失败又被静默吞掉，「明文已删、密文未落」时该条念想永久丢失。
+    // 现在任一键落盘失败即中止迁移并保留明文（可重试；secure-store v1.1.1 起落盘失败会抛出）。
+    async function migratePlaintextToEncrypted() {
+      var S = SS(); if (!S || !S.isReady()) return false;
+      var keys = S.KNOWN_KEYS;
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
         try {
           var raw = localStorage.getItem(k);
-          if (raw == null) return;
-          S.set(k, JSON.parse(raw));   // 加密写入（cache 同步、落盘异步且内部已容错）
-          localStorage.removeItem(k);  // 源明文已迁走，删除明文副本，避免设备丢失仍可读
-        } catch (e) { if (window.console) console.warn('[时念] 迁移加密失败（保留明文）:', k, e); }
-      });
+          if (raw == null) continue;
+          await S.set(k, JSON.parse(raw)); // 落盘确认（失败抛出）
+          localStorage.removeItem(k);      // 源明文已确认迁走，删除明文副本，避免设备丢失仍可读
+        } catch (e) {
+          if (window.console) console.warn('[时念] 迁移加密失败（已中止，保留明文）:', k, e);
+          return false;
+        }
+      }
+      return true;
     }
     // 关闭加密存储：用内存 DEK 解密现有数据回写明文，再清 vault 信封与密文 blob
+    // v1.1.1（Q3）：遍历 dataKeys()（KNOWN_KEYS ∪ 存储密文键），新业务键不再漏迁
     function migrateEncryptedToPlaintextAndClear() {
       var S = SS(); if (!S || !S.isReady()) return false;
       var ok = true;
-      S.KNOWN_KEYS.forEach(function (k) {
+      var keys = (S.dataKeys && S.dataKeys()) || S.KNOWN_KEYS;
+      keys.forEach(function (k) {
         try {
           var val = S.get(k); // 解密后的明文（来自内存 cache）
           if (val !== null && val !== undefined) localStorage.setItem(k, JSON.stringify(val));
@@ -1710,7 +1732,7 @@
       try {
         localStorage.removeItem('shinian.vault.v1');
         localStorage.removeItem('shinian.vault.bio.v1');
-        S.KNOWN_KEYS.forEach(function (k) { localStorage.removeItem(k + '__enc'); });
+        keys.forEach(function (k) { localStorage.removeItem(k + '__enc'); });
       } catch (e) { ok = false; }
       S.lock(); // 清内存 DEK，使 Store 回落明文
       return ok;

@@ -43,6 +43,7 @@ const ShiNianCore = {
     set: secureStore.set,
     changePassword: secureStore.changePassword,
     KNOWN_KEYS: secureStore.KNOWN_KEYS,
+    dataKeys: secureStore.dataKeys, // v1.1.1（Q3）：全键集（自愈式键发现），迁移/改密遍历用
   },
   // B2：生物锁原生桥接（Web 下 supported=false，自动降级主密码）
   biometric: {
