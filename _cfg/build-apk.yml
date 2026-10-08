@@ -34,8 +34,11 @@ jobs:
       - name: 运行自动化测试
         run: npm test
 
-      # 零构建结构（index.html 双击即用，无打包器）：网页静态资源由下方 cap sync 直接拷贝，
-      # 无需、也不存在 npm run build 步骤；此前误写该步骤会导致 APK 流水线硬失败。
+      # 发布态构建：esbuild 把 src/（加密保险库 + 生物锁桥接）编译为 www/assets/shinian-core.min.js，
+      # 并把 12 个 vanilla 脚本混淆打包为 www/assets/bundle.min.js；www/ 即 Capacitor 的 webDir，
+      # 必须由 cap sync 拷入 APK 的 assets。漏跑此步会导致 APK 不含加密层 / 生物锁。
+      - name: 发布态构建（生成 www/）
+        run: npm run build:release
 
       - name: 添加 Android 平台
         run: npx cap add android
@@ -45,6 +48,73 @@ jobs:
 
       - name: 同步 Web 资源到 Android
         run: npx cap sync android
+
+      # B4 · WebView / Android 硬化：cap sync 生成的清单基础上补安全配置（发布态强制）
+      #   - allowBackup=false：禁止 adb backup 导出应用私有数据（保险库密文不随备份泄露）
+      #   - debuggable=false：发布包关闭调试桥
+      #   - usesCleartextTraffic=false + network_security_config：禁用明文流量、拒绝用户证书 MITM
+      #   - WebView.EnableSafeBrowsing=true：开启安全浏览防护
+      #   - 生物锁权限（USE_BIOMETRIC）确保注入（插件通常会自动加，这里兜底）
+      - name: B4 · 注入 Android 清单加固
+        run: |
+          set -e
+          MAN=android/app/src/main/AndroidManifest.xml
+          echo ">> 原始 Manifest 头部："; sed -n '1,20p' "$MAN"
+          # 在 <application 标签上追加加固属性（若已存在则跳过，避免重复）
+          python3 - <<'PY'
+          import re, io
+          p = "android/app/src/main/AndroidManifest.xml"
+          s = open(p, encoding="utf-8").read()
+          app_tag = re.search(r'<application\b', s)
+          if not app_tag:
+              raise SystemExit("未找到 <application> 标签")
+          attrs = {
+              'android:allowBackup': 'false',
+              'android:debuggable': 'false',
+              'android:usesCleartextTraffic': 'false',
+              'android:networkSecurityConfig': '@xml/network_security_config',
+          }
+          for k, v in attrs.items():
+              if re.search(re.escape(k) + r'=', s):
+                  print(f"  已存在 {k}，跳过")
+                  continue
+              s = s[:app_tag.end()] + f' {k}="{v}"' + s[app_tag.end():]
+              print(f"  注入 {k}={v}")
+          # 兜底注入生物锁权限（插件通常会自动加）
+          if 'android.permission.USE_BIOMETRIC' not in s:
+              s = s.replace('</manifest>',
+                  '    <uses-permission android:name="android.permission.USE_BIOMETRIC" />\n</manifest>')
+              print("  注入 USE_BIOMETRIC 权限")
+          # 注入 WebView 安全浏览 meta-data（放进 <application> 内）
+          if 'WebView.EnableSafeBrowsing' not in s:
+              s = re.sub(r'(<application\b[^>]*>)',
+                  r'\1\n        <meta-data android:name="android.webkit.WebView.EnableSafeBrowsing" android:value="true" />',
+                  s, count=1)
+              print("  注入 WebView.EnableSafeBrowsing")
+          open(p, "w", encoding="utf-8").write(s)
+          PY
+          echo ">> 加固后 Manifest 头部："; sed -n '1,24p' "$MAN"
+
+      - name: B4 · 写入网络安全配置（禁明文 / 拒用户证书）
+        run: |
+          set -e
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/network_security_config.xml <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <network-security-config>
+            <!-- 发布态基线：禁用明文流量，且不信任用户/调试证书（防 MITM） -->
+            <base-config cleartextTrafficPermitted="false">
+              <trust-anchors>
+                <certificates src="system" />
+              </trust-anchors>
+            </base-config>
+            <!-- 仅天气 API 走 HTTPS；其余域名一律拒绝 -->
+            <domain-config cleartextTrafficPermitted="false">
+              <domain includeSubdomains="true">api.open-meteo.com</domain>
+            </domain-config>
+          </network-security-config>
+          XML
+          echo ">> 已写入 network_security_config.xml"
 
       # 签名准备：仅在仓库配置了 KEYSTORE_BASE64 等 Secrets 时才走正式签名包
       - name: 准备签名（如配置了 Secrets）
