@@ -789,3 +789,100 @@ input[type="date"] { color-scheme: dark; }
 @media (prefers-reduced-motion: reduce) {
   #splash .splash-card { opacity: 1; transform: none; animation: none; }
 }
+
+/* ============================================================
+   B1 · 加密启动守卫（vault-modal）：设密码 / 解锁 / 改密
+   复用既有玻璃配方令牌，做成覆盖全屏的居中卡片，置于所有内容之上
+   ============================================================ */
+.vault-modal {
+  position: fixed; inset: 0;
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: rgba(4, 12, 22, .72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: vault-fade var(--dur-base) var(--ease-out) both;
+}
+.vault-modal[hidden] { display: none; }
+@keyframes vault-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.vault-card {
+  width: 100%; max-width: 340px;
+  padding: 28px 24px;
+  border-radius: var(--radius);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  text-align: center;
+  animation: vault-pop var(--dur-base) var(--ease-out) both;
+}
+@keyframes vault-pop {
+  from { opacity: 0; transform: translateY(16px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.vault-title {
+  font-size: 19px; font-weight: 600;
+  color: var(--text);
+  letter-spacing: .04em;
+}
+.vault-sub {
+  margin-top: 8px;
+  font-size: 13px; line-height: 1.5;
+  color: var(--text-dim);
+}
+.vault-input {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 14px;
+  font-size: 15px;
+  color: var(--text);
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.vault-input::placeholder { color: var(--text-faint); }
+.vault-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.vault-input[hidden] { display: none; }
+
+.vault-err {
+  margin-top: 12px;
+  font-size: 12.5px; line-height: 1.5;
+  color: var(--danger);
+}
+.vault-err[hidden] { display: none; }
+
+.vault-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 16px;
+  font-size: 15px; font-weight: 600;
+  color: #06121f;
+  background: var(--accent);
+  border: none; border-radius: 12px;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--spring), filter var(--dur-fast) var(--ease-out);
+}
+.vault-btn:hover { filter: brightness(1.06); }
+.vault-btn:active { transform: scale(.97); }
+.vault-btn[disabled] { opacity: .55; cursor: not-allowed; filter: none; transform: none; }
+
+.vault-btn-ghost {
+  margin-top: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--glass-border);
+}
+.vault-btn-ghost:hover { filter: none; background: var(--accent-soft); color: var(--text); }
+.vault-btn-ghost[hidden] { display: none; }
+
+/* 减弱动态：覆盖层与卡片直接呈现，不飘入 */
+@media (prefers-reduced-motion: reduce) {
+  .vault-modal, .vault-card { animation: none; }
+}

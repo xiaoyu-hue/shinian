@@ -9,6 +9,30 @@
   var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 
   // ============================================================
+  // A3 + B1 · 统一加密存储层桥接
+  // release 模式（esbuild 编译进 shinian-core.min.js）下 window.ShiNianCore.secureStore 存在，
+  // 解锁后走 AES-GCM 加密；dev/file:// 双击下该对象不存在，自动降级明文 localStorage（保持零构建可开）。
+  // ============================================================
+  var Store = (function () {
+    function ss() { return (window.ShiNianCore && window.ShiNianCore.secureStore) || null; }
+    function get(key) {
+      var s = ss();
+      if (s && s.isReady && s.isReady()) {
+        try { return s.get(key); } catch (e) { return null; }
+      }
+      try { var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+    }
+    function set(key, val) {
+      var s = ss();
+      if (s && s.isReady && s.isReady()) {
+        try { s.set(key, val); return; } catch (e) { if (window.console) console.warn('[时念] 加密存储失败（降级明文）:', e); }
+      }
+      try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { if (window.console) console.warn('[时念] 保存失败（已跳过）:', e); }
+    }
+    return { get: get, set: set };
+  })();
+
+  // ============================================================
   // 全局容错（v0.6.1）：任何运行时错误都只记录、不白屏
   // 单条初始化失败不影响其余功能，最差情况也能看到时钟与倒数日
   // ============================================================
@@ -101,13 +125,12 @@
 
   function load() {
     try {
-      var raw = localStorage.getItem(KEY);
-      var arr = raw ? JSON.parse(raw) : [];
+      var arr = Store.get(KEY);
       return Array.isArray(arr) ? arr : [];
     } catch (e) { return []; }
   }
   function save(items) {
-    try { localStorage.setItem(KEY, JSON.stringify(items)); }
+    try { Store.set(KEY, items); }
     catch (e) { if (window.console) console.warn('[时念] 保存念想失败（已跳过）:', e); }
   }
 
@@ -117,13 +140,12 @@
 
   function loadWishes() {
     try {
-      var raw = localStorage.getItem(WISH_KEY);
-      var arr = raw ? JSON.parse(raw) : [];
+      var arr = Store.get(WISH_KEY);
       return Array.isArray(arr) ? arr : [];
     } catch (e) { return []; }
   }
   function saveWishes(list) {
-    try { localStorage.setItem(WISH_KEY, JSON.stringify(list)); } catch (e) {}
+    try { Store.set(WISH_KEY, list); } catch (e) {}
   }
   function newWishId() {
     return 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -561,8 +583,7 @@
 
   function getSavedCity() {
     try {
-      var raw = localStorage.getItem(CITY_KEY);
-      var c = raw ? JSON.parse(raw) : null;
+      var c = Store.get(CITY_KEY);
       // 容错：本地存储损坏（如空对象 / 字段缺失）时回退默认城市，
       // 否则 currentCity.lat 为 undefined 会在天气请求里抛 TypeError
       if (c && typeof c.lat === 'number' && typeof c.lon === 'number' && typeof c.name === 'string') {
@@ -575,7 +596,7 @@
   var citySeq = 0;   // v0.7.4：城市切换序号守卫（防快切 A→B 时 A 的迟到响应覆盖 B）
   function saveCity(city) {
     currentCity = city;
-    localStorage.setItem(CITY_KEY, JSON.stringify(city));
+    Store.set(CITY_KEY, city);
     document.getElementById('cityLabel').textContent = city.name;
     var mySeq = ++citySeq;
     // 拉取天气并通知 sky.js；序号不符则视为陈旧响应，直接丢弃
@@ -797,7 +818,7 @@
 
   function loadSettings() {
     try {
-      var s = JSON.parse(localStorage.getItem(SET_KEY) || 'null');
+      var s = Store.get(SET_KEY);
       if (s && typeof s === 'object') {
         if (s.recipe === 'auto' || s.recipe === 'light' || s.recipe === 'dark') settings.recipe = s.recipe;
         if (typeof s.motion === 'boolean') settings.motion = s.motion;
@@ -838,7 +859,7 @@
     applySettings();
   }
   function saveSettings() {
-    try { localStorage.setItem(SET_KEY, JSON.stringify(settings)); } catch (e) {}
+    try { Store.set(SET_KEY, settings); } catch (e) {}
   }
   function applySettings() {
     var root = document.documentElement;
@@ -1517,9 +1538,112 @@
     setWeatherRefreshMin: function (v) { settings.weatherRefreshMin = v; }
   };
 
+  // ============================================================
+  // B1 · 加密启动守卫 / 应用锁（vault-modal 控制器）
+  // release 模式：window.ShiNianCore.secureStore 存在时，先弹框设密码/解锁再 boot()；
+  // dev/file:// 模式：secureStore 不存在，直接 boot()（明文 localStorage 降级）。
+  // ============================================================
+  var VaultCtl = (function () {
+    var SS = function () { return (window.ShiNianCore && window.ShiNianCore.secureStore) || null; };
+    var modal = document.getElementById('vaultModal');
+    var titleEl = document.getElementById('vaultTitle');
+    var subEl = document.getElementById('vaultSub');
+    var pwdEl = document.getElementById('vaultPwd');
+    var pwd2El = document.getElementById('vaultPwd2');
+    var errEl = document.getElementById('vaultErr');
+    var submitEl = document.getElementById('vaultSubmit');
+    var bioEl = document.getElementById('vaultBio');
+    var booted = false;
+
+    function fail(msg) { errEl.textContent = msg; errEl.hidden = false; }
+    function clearErr() { errEl.hidden = true; errEl.textContent = ''; }
+
+    function open(mode) {
+      clearErr();
+      modal.dataset.mode = mode;
+      pwdEl.value = ''; pwd2El.value = '';
+      pwdEl.hidden = false; pwd2El.hidden = (mode !== 'setup');
+      // 仅当原生层暴露 biometric 且设备已支持并登记时才显示生物锁按钮（B2）
+      var bio = window.ShiNianCore && window.ShiNianCore.biometric;
+      bioEl.hidden = !(bio && bio.isSupported && bio.isSupported() && bio.isEnrolled && bio.isEnrolled());
+      if (mode === 'setup') {
+        titleEl.textContent = '时念 · 设置主密码';
+        subEl.textContent = '为你的念想设置主密码（本地加密、无法找回，请务必牢记）';
+        pwdEl.placeholder = '主密码（至少 6 位）';
+        pwd2El.placeholder = '再次输入确认';
+        submitEl.textContent = '创建保险库';
+      } else {
+        titleEl.textContent = '时念 · 解锁';
+        subEl.textContent = '输入主密码以查看你的念想';
+        pwdEl.placeholder = '主密码';
+        pwd2El.placeholder = '再次输入确认';
+        submitEl.textContent = '解锁';
+      }
+      modal.hidden = false;
+      setTimeout(function () { try { pwdEl.focus(); } catch (e) {} }, 30);
+    }
+    function close() { modal.hidden = true; }
+
+    function onSuccess() {
+      close();
+      if (!booted) { booted = true; boot(); }
+      // 已 booted（重锁后重开）：cache 已被 re-prime，DOM 仍准确，无需重 render
+    }
+
+    function submit() {
+      var S = SS();
+      if (!S) { onSuccess(); return; } // dev 模式无加密层，直接进
+      if (modal.dataset.mode === 'setup') {
+        var p1 = pwdEl.value, p2 = pwd2El.value;
+        if (p1.length < 6) { fail('主密码至少 6 位'); return; }
+        if (p1 !== p2) { fail('两次输入不一致'); return; }
+        submitEl.disabled = true;
+        S.setup(p1).then(function () { submitEl.disabled = false; onSuccess(); })
+          .catch(function (e) { submitEl.disabled = false; fail('创建失败：' + (e && e.message || e)); });
+      } else {
+        var p = pwdEl.value;
+        if (!p) { fail('请输入主密码'); return; }
+        submitEl.disabled = true;
+        S.unlock(p).then(function () { submitEl.disabled = false; onSuccess(); })
+          .catch(function () { submitEl.disabled = false; fail('主密码错误'); });
+      }
+    }
+
+    function onBio() {
+      var S = SS(); if (!S) return;
+      submitEl.disabled = true; bioEl.disabled = true;
+      S.unlockWithBiometric().then(function () { submitEl.disabled = false; bioEl.disabled = false; onSuccess(); })
+        .catch(function (e) { submitEl.disabled = false; bioEl.disabled = false; fail('生物锁解锁失败：' + (e && e.message || e)); });
+    }
+
+    submitEl.addEventListener('click', submit);
+    pwdEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    pwd2El.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    if (bioEl) bioEl.addEventListener('click', onBio);
+
+    // 应用锁：回前台重新验证（B2 应用锁的密码侧）。已锁（modal 在）则不重复触发。
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) return;
+      if (!booted) return;
+      var S = SS();
+      if (!S || !S.isReady()) return;
+      S.lock();
+      open('unlock');
+    });
+
+    function start() {
+      var S = SS();
+      if (!S) { booted = true; boot(); return; } // dev/file://：无加密层，直接启动
+      if (S.needsSetup()) open('setup');
+      else open('unlock');
+    }
+
+    return { start: start };
+  })();
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', VaultCtl.start);
   } else {
-    boot();
+    VaultCtl.start();
   }
 })();

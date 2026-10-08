@@ -2,14 +2,18 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<!-- v0.6.3 · P1：内容安全策略（纵深防御）。
+<!-- v0.6.3 · P1 → v1.0.0 · B4：内容安全策略（纵深防御，本次收紧）。
      本项目 XSS 风险本就极低（全部动态文本走 textContent），CSP 作为额外加固层：
        - 资源仅限同源 'self'
        - 外联请求仅放行 Open-Meteo（天气）
        - script-src 留 'unsafe-inline' 以兼容 head 内「条件注入本地通知插件」的内联脚本（APK 路径所需）
+       - 新增 form-action 'none' / manifest-src 'self' / worker-src 'self' blob: / block-all-mixed-content
+         进一步收敛攻击面（无表单提交、无第三方 worker、禁混合内容）
      若将来去除该内联脚本，可改为 nonce/hash 进一步收紧。 -->
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https://api.open-meteo.com; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
+      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https://api.open-meteo.com; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'none'; manifest-src 'self'; worker-src 'self' blob:; block-all-mixed-content">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="Referrer-Policy" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#04111d">
 <title>时念 · ShiNian</title>
@@ -332,5 +336,20 @@
 
     <footer class="foot">时念 · ShiNian</footer>
   </main>
+
+  <!-- B1/B2 · 加密启动守卫 / 应用锁 modal（release 模式加密层可用时弹出；dev/file:// 下不显示） -->
+  <div class="vault-modal" id="vaultModal" hidden>
+    <div class="vault-card glass" role="dialog" aria-modal="true" aria-labelledby="vaultTitle">
+      <div class="vault-title" id="vaultTitle">时念 · 解锁</div>
+      <div class="vault-sub" id="vaultSub">输入主密码以查看你的念想</div>
+      <input type="password" id="vaultPwd" class="vault-input" placeholder="主密码"
+             autocomplete="current-password" aria-label="主密码">
+      <input type="password" id="vaultPwd2" class="vault-input" placeholder="再次输入确认"
+             autocomplete="new-password" aria-label="确认主密码" hidden>
+      <div class="vault-err" id="vaultErr" hidden></div>
+      <button type="button" class="vault-btn" id="vaultSubmit">解锁</button>
+      <button type="button" class="vault-btn vault-btn-ghost" id="vaultBio" hidden>使用生物锁</button>
+    </div>
+  </div>
 </body>
 </html>
