@@ -198,6 +198,15 @@
           <p class="set-note" id="encStoreNote">开启后本地数据用主密码加密（AES-GCM-256），设备丢失也无法读取；需先设置主密码。开启即把现有数据迁为加密。移动端默认强制开启。</p>
         </div>
 
+        <div class="set-block" id="appLockBlock">
+          <label class="set-row" for="appLockToggle">
+            <span>应用锁（回前台验证）</span>
+            <button type="button" class="set-toggle" id="appLockToggle"
+                    role="switch" aria-checked="true" aria-label="应用锁"></button>
+          </label>
+          <p class="set-note" id="appLockNote">离开页面超过 2 分钟后再回来时，需输入主密码（或生物锁）解锁。移动端始终开启。</p>
+        </div>
+
         <div class="set-block">
           <div class="set-label">数据 · 共 <span id="itemCount">0</span> 条念想</div>
           <div class="set-actions">

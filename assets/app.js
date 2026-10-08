@@ -816,6 +816,7 @@
     clouds: true, cloudAmount: 'auto',   // v0.7.1 云彩开关与云量档位（auto=跟随天气）
     cloudGap: 'mid',                     // v0.7.1 空窗期：off=连续有云 / short / mid / long
     meteor: true, meteorRate: 'real', meteorGap: 30,  // v0.7.3 流星：开关 / 间隔档位 / 自定义秒数
+    appLock: true,                       // v1.1.1（Q2）应用锁：回前台超宽限期需重新解锁（仅网页端可关；移动端强制开）
     wishCollapsed: true,          // v0.5.9 许愿池默认折叠；用户可自定义并记住
     remindCollapsed: true,        // v0.6.1 提醒模块默认折叠；用户可自定义并记住
     weatherRefreshMin: 5,         // v0.6.2 温度自动刷新间隔（分钟）：0=关闭，可选 5/10/15/30
@@ -845,6 +846,7 @@
         if (isFinite(s.meteorGap)) settings.meteorGap = Math.min(300, Math.max(5, Math.round(+s.meteorGap)));
         if (typeof s.wishCollapsed === 'boolean') settings.wishCollapsed = s.wishCollapsed;
         if (typeof s.remindCollapsed === 'boolean') settings.remindCollapsed = s.remindCollapsed;
+        if (typeof s.appLock === 'boolean') settings.appLock = s.appLock; // v1.1.1（Q2）
         if (s.remind && typeof s.remind === 'object') {
           var r = s.remind;
           if (typeof r.water === 'boolean') settings.remind.water = r.water;
@@ -966,6 +968,21 @@
       } else {
         var encOn = localStorage.getItem('shinian.enc.enabled') === '1';
         et.classList.toggle('on', encOn); et.setAttribute('aria-checked', String(encOn)); et.disabled = false;
+      }
+    }
+
+    // v1.1.1（Q2）应用锁开关状态与可见性：file:// 无加密层隐藏；移动端强制开置灰；网页按设置值
+    var alt = document.getElementById('appLockToggle');
+    var alb = document.getElementById('appLockBlock');
+    if (alt && alb) {
+      var lockAvail = !!(window.ShiNianCore && window.ShiNianCore.secureStore);
+      if (!lockAvail) { alb.hidden = true; }
+      else if (window.Capacitor) {
+        alt.classList.add('on'); alt.setAttribute('aria-checked', 'true'); alt.disabled = true;
+      } else {
+        alt.classList.toggle('on', settings.appLock !== false);
+        alt.setAttribute('aria-checked', String(settings.appLock !== false));
+        alt.disabled = false;
       }
     }
 
@@ -1154,6 +1171,18 @@
       startWeatherAutoRefresh();
       haptic(6);
     });
+
+    // v1.1.1（Q2）应用锁开关绑定（仅网页端；移动端置灰不可点；file:// 已隐藏）
+    var appLockToggleEl = document.getElementById('appLockToggle');
+    if (appLockToggleEl && window.ShiNianCore && window.ShiNianCore.secureStore && !window.Capacitor) {
+      appLockToggleEl.addEventListener('click', function () {
+        settings.appLock = !(settings.appLock !== false);
+        saveSettings(); haptic(8);
+        syncSettingsUI();
+        hint(settings.appLock ? '应用锁已开启：离开超 2 分钟后回来需重新解锁'
+                              : '应用锁已关闭（移动端不受此开关影响）');
+      });
+    }
 
     // 加密存储开关（方案 A）：仅部署版/App 可用（有 ShiNianCore.crypto）；dev/file:// 由 syncSettingsUI 隐藏
     var encToggle = document.getElementById('encToggle');
@@ -1805,18 +1834,30 @@
     if (bioEl) bioEl.addEventListener('click', onBio);
 
     // 应用锁：回前台重新验证（B2 应用锁的密码侧）。已锁（modal 在）则不重复触发。
+    // v1.1.1（Q2）：加 2 分钟宽限期 + 网页端开关——原实现「任何 visibility 变化即锁」
+    // 会把「切标签页查个资料 / 回个微信」都变成强制输密码，体验灾难且会劝退用户关闭
+    // 加密存储。现：离开 ≤2 分钟内返回不锁；网页端可在设置关闭（移动端始终强制开启）。
+    var APPLOCK_GRACE_MS = 120 * 1000;
+    var lastHiddenAt = 0;
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) return;
+      if (document.hidden) { lastHiddenAt = Date.now(); return; }
       if (!booted) return;
       var S = SS();
       if (!S || !S.isReady()) return;
+      if (!window.Capacitor && settings.appLock === false) return; // 网页端用户已关闭应用锁
+      if (lastHiddenAt && (Date.now() - lastHiddenAt) < APPLOCK_GRACE_MS) return; // 宽限期内返回
       S.lock();
       open('unlock');
     });
 
-    function start() {
+    // v1.1.1（Q5）：start 改 async——biometric 模块加载即异步自检能力（void detect()），
+    // 若在自检完成前读取 isSupported() 会误判「不支持生物锁」而隐藏生物按钮/漏登记。
+    // 启动时显式 await init() 消除竞态（init 幂等、失败不影响主流程）。
+    async function start() {
       var S = SS();
       if (!S) { booted = true; boot(); return; } // dev/file://：无加密层，直接启动（明文）
+      var bio = window.ShiNianCore && window.ShiNianCore.biometric;
+      if (bio && bio.init) { try { await bio.init(); } catch (e) { /* 检测失败按无生物处理 */ } }
       // 移动端（Capacitor）：始终强制加密存储，忽略网页端开关
       if (window.Capacitor) {
         if (S.needsSetup()) open('setup'); else open('unlock');
