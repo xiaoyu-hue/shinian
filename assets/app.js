@@ -40,6 +40,21 @@
     return { get: get, set: set };
   })();
 
+  // v1.1.2 修 3：本地版本（release 构建时由 build-www.js 注入 package.json 版本；dev 下为 'dev'）
+  function currentVersion() {
+    var m = document.querySelector('meta[name="shinian-version"]');
+    return (m && m.getAttribute('content')) || 'dev';
+  }
+  // 语义化版本比较：latest 是否新于 current（仅比较数值段，非数值段按 0 处理）
+  function isNewerVersion(latest, current) {
+    var pa = String(latest).split('.'), pb = String(current).split('.');
+    for (var i = 0; i < 3; i++) {
+      var x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0;
+      if (x !== y) return x > y;
+    }
+    return false;
+  }
+
   // ============================================================
   // 全局容错（v0.6.1）：任何运行时错误都只记录、不白屏
   // 单条初始化失败不影响其余功能，最差情况也能看到时钟与倒数日
@@ -1184,6 +1199,43 @@
       });
     }
 
+    // v1.1.2 修 3：检查更新——读 GitHub Releases 最新 tag 与本地版本比较，
+    // 有新版则引导跳转下载页（Capacitor 外链自动交给系统浏览器打开）。
+    var verEl = document.getElementById('appVersion');
+    if (verEl) verEl.textContent = currentVersion();
+    var cuBtn = document.getElementById('checkUpdateBtn');
+    if (cuBtn) cuBtn.addEventListener('click', function () {
+      var note = document.getElementById('updateNote');
+      cuBtn.disabled = true;
+      if (note) { note.hidden = false; note.textContent = '正在检查更新…'; }
+      var cur = currentVersion();
+      fetch('https://api.github.com/repos/xiaoyu-hue/shinian/releases/latest',
+            { headers: { 'Accept': 'application/vnd.github+json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (rel) {
+          cuBtn.disabled = false;
+          var latest = ((rel && rel.tag_name) || '').replace(/^v/, '');
+          if (!latest) { if (note) note.textContent = '检查失败：未获取到版本信息'; return; }
+          if (cur !== 'dev' && !isNewerVersion(latest, cur)) {
+            if (note) note.textContent = latest === cur ? ('已是最新版本 v' + cur) : ('本地 v' + cur + '，最新 Release v' + latest);
+            return;
+          }
+          if (note) {
+            note.textContent = '';
+            var a = document.createElement('a');
+            a.href = rel.html_url || ('https://github.com/xiaoyu-hue/shinian/releases');
+            a.textContent = '发现新版本 v' + latest + '，即将前往下载页…';
+            a.style.color = 'var(--accent)';
+            note.appendChild(a);
+            setTimeout(function () { window.location.href = rel.html_url || a.href; }, 2500);
+          }
+        })
+        .catch(function () {
+          cuBtn.disabled = false;
+          if (note) note.textContent = '检查失败（网络不可达），稍后再试';
+        });
+    });
+
     // 加密存储开关（方案 A）：仅部署版/App 可用（有 ShiNianCore.crypto）；dev/file:// 由 syncSettingsUI 隐藏
     var encToggle = document.getElementById('encToggle');
     if (encToggle && window.ShiNianCore && window.ShiNianCore.crypto && window.ShiNianCore.crypto.encryptWithPassword && !window.Capacitor) {
@@ -1428,9 +1480,12 @@
      - 减弱动态时跳过流星与闪烁，静态呈现并快速淡出
      - 真机：先收起原生闪屏(native)，用双 rAF 等其淡出首帧后再播 Web 开场；
        网页版：直接播放 Web 开场。兜底计时器保证绝不卡在启动画面 */
-  function initSplash() {
+  // v1.1.2 修 1：接受可选 onDone 回调——开场动画与业务启动解耦。
+  // 原缺陷：initSplash 只在 boot() 内执行，而首次设密码时 boot 被推迟到解锁后，
+  // 导致 APK 冷启动只见密码框、开场动画从未播放（用户反馈 2026-10-08）。
+  function initSplash(onDone) {
     var el = document.getElementById('splash');
-    if (!el) return;
+    if (!el) { if (typeof onDone === 'function') onDone(); return; }
     var canvas = document.getElementById('splashCanvas');
     var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     var MIN = reduce ? 320 : 2700;   // 开场总时长（非减弱：星场苏醒 + 多流星引路 + 停留）
@@ -1444,6 +1499,8 @@
         el.classList.add('removed');
         if (el.parentNode) el.parentNode.removeChild(el);
       }, 520);
+      // v1.1.2：淡出先行约 250ms 后再放行业务启动（弹密码框 / 进主界面），观感顺滑
+      if (typeof onDone === 'function') setTimeout(onDone, 250);
     }
     function startWeb() {
       el.classList.add('splash-run');
@@ -1603,7 +1660,6 @@
     safe('initForm', initForm);
     safe('initPerfMonitor', initPerfMonitor);
     safe('render', render);
-    safe('initSplash', initSplash);       // 启动开场：Web 覆盖层接棒原生闪屏（无插件时仅淡出覆盖层）
     safe('initSkyClouds', initSkyClouds); // 主天空云彩层（共享云引擎，与开场同一片云）
     // 许愿池不依赖城市数据，同步初始化（避免城市加载失败时永远不出现）
     safe('initWishes', initWishes);
@@ -1886,8 +1942,11 @@
   })();
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', VaultCtl.start);
+    // v1.1.2 修 1：先播开场动画，动画收尾后再进入密码框 / 主界面判定（见 initSplash onDone）
+    document.addEventListener('DOMContentLoaded', function () {
+      safe('initSplash', function () { initSplash(function () { VaultCtl.start(); }); });
+    });
   } else {
-    VaultCtl.start();
+    safe('initSplash', function () { initSplash(function () { VaultCtl.start(); }); });
   }
 })();

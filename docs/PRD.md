@@ -201,3 +201,4 @@
 | 2026-10-08 | v1.0.1 交付 | B3 收口 + 安全区与体验修复 + 审计文档勘误。发布 [v1.0.1](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.0.1) |
 | 2026-10-08 | v1.1.0 交付 | 免费安全审计（CodeQL / Gitleaks / Semgrep / MobSF / Dependabot + Secret Scanning）+ 网页端加密存储开关（方案 A）+ 加密备份导出 / 导入；测试 13 套 211 项。发布 [v1.1.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.1.0) |
 | 2026-10-08 | v1.1.1 交付 | 二次审查整改：P1 迁移竞态根治（数据丢失）+ P1 应用锁 2 分钟宽限期与开关 + 自愈式键发现 + 落盘队列化 + flaky 测试修稳 + 清理（删 `_cfg/` 等）；首次 Release 附签名 APK；E2E 实测 6 场景全过。发布 [v1.1.1](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.1.1) |
+| 2026-10-08 | v1.1.2 交付 | 真机反馈四连修：开场动画与锁屏时序解耦、APK 专属图标恢复、设置内检查更新（GitHub Releases）、APK 版本号注入（versionName/versionCode）。发布 [v1.1.2](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.1.2) |

@@ -138,6 +138,10 @@ fs.copyFileSync(path.join(root, 'assets', 'plugins', 'local-notifications.js'),
 
 // 3) 生成 release 版 index.html：去掉散 script，改为引用 core + bundle；保留条件注入块
 let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+// v1.1.2 修 3：把版本 meta 替换为 package.json 真实版本（「检查更新」的数据源）
+const pkgVersion = require(path.join(root, 'package.json')).version;
+html = html.replace(/<meta name="shinian-version" content="[^"]*">/,
+  '<meta name="shinian-version" content="' + pkgVersion + '">');
 html = html.replace(/<script src="assets\/[^"]+\.js" defer><\/script>\s*/g, '');
 html = html.replace(/(<link rel="stylesheet" href="assets\/style\.css">)/,
   '$1\n  <script src="assets/shinian-core.min.js" defer></script>\n  <script src="assets/bundle.min.js" defer></script>');

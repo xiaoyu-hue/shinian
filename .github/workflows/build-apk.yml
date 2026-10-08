@@ -49,6 +49,24 @@ jobs:
       - name: 注入 Capacitor Android 平台（首次生成 android/）
         run: test -d android || npx cap add android
 
+      # v1.1.2 修 2：应用仓库专属图标与启动画面——v1.0.0 重写 workflow 时该步骤
+      # 被误删，导致 APK 一直用 Capacitor 默认图标（用户反馈 2026-10-08）。
+      # resources/android/res/ 含全套 mipmap ic_launcher（含自适应/单色图标）与各分辨率 splash。
+      - name: 应用专属图标与启动画面
+        run: cp -rv resources/android/res/. android/app/src/main/res/
+
+      # v1.1.2 修 4：注入应用版本号——cap add 生成的 build.gradle 固定 versionName "1.0"，
+      # 与 package.json 脱节（用户看到"版本 1.0"即此因）。versionName 取 package.json，
+      # versionCode 用 git 提交计数单调递增，保证覆盖升级不被系统拒绝。
+      - name: 注入版本号（versionName / versionCode）
+        run: |
+          APP_VERSION=$(node -p "require('./package.json').version")
+          VERSION_CODE=$(git rev-list --count HEAD)
+          sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$APP_VERSION\"/" android/app/build.gradle
+          echo "注入版本: versionName=$APP_VERSION versionCode=$VERSION_CODE"
+          grep -n "versionCode\|versionName" android/app/build.gradle | head -2
+
       - name: 同步 Web 资源到原生工程
         run: npx cap sync android
 
