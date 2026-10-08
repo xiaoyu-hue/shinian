@@ -1,5 +1,7 @@
 # 时念 ShiNian · OWASP MASVS v2.1 安全自审报告（v1.0.0）
 
+> **时点说明（v1.1.3 加注）**：本报告为 v1.0.0 时点的审计快照。文中引用的 `_cfg/build-apk.yml` 为当时的 CI 工作流路径，该目录已于 v1.1.3 清理，现行工作流位于 `.github/workflows/build-apk.yml`。
+
 - **版本**：v1.0.0（对齐 `1.0.0-alpha.5` 收尾）
 - **评估日期**：2026-10-08
 - **评估范围**：网页版（零构建 `file://` + 发布态 `www/`）与 Android APK（Capacitor 6 壳）
