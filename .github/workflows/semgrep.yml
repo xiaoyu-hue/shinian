@@ -1,7 +1,7 @@
 name: Semgrep SAST
 
 # 代码层 SAST：模式匹配扫 JS/TS 的 XSS / 注入 / 弱加密等 OWASP Top 10 模式。
-# 开源规则集免费；跑 PR diff，开发者在评审前看到结果。
+# 开源规则集免费；push/PR 全量扫描，结果进 GitHub Security 面板。
 on:
   pull_request:
   push:
@@ -22,12 +22,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # 直跑 semgrep CLI 而非 returntocorp/semgrep-action：
+      # 后者的 SARIF 后处理遇到 OWASP 规则集的非标 severity（如 MEDIUM）会抛
+      # ValueError: invalid rule severity value → semgrep.sarif 从未生成，
+      # 上传步骤报 "Path does not exist"（CI 长期红的根因，2026-10-08 修复）。
+      # --error：仅 ERROR 级发现令步骤失败；WARNING/INFO 不挡构建，仍全量上传。
       - name: Run Semgrep
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/owasp-top-ten
-          generateSarif: true
+        run: semgrep scan --config p/owasp-top-ten --sarif --output semgrep.sarif --metrics=off --error
 
       - name: Upload SARIF to Security tab
         if: always()
