@@ -118,6 +118,43 @@ export async function aesDecrypt(dek: Uint8Array, blob: EncryptedBlob): Promise<
   return textDec.decode(await gcmDecrypt(await importAes(dek), blob));
 }
 
+/**
+ * 加密备份信封：用「主密码」派生的 KEK 直接加密任意明文。
+ * 与存储层（DEK / secureStore）解耦——备份加密只依赖主密码，不依赖保险库是否已解锁，
+ * 便于用户在任意端用同一主密码导出/导入加密备份。
+ */
+export interface BackupEnvelope {
+  kind: 'shinian-backup';
+  v: 1;
+  kdf: 'PBKDF2';
+  hash: 'SHA-256';
+  iterations: number;
+  salt: string; // base64
+  iv: string;   // base64
+  ct: string;   // base64
+}
+
+/** 用主密码加密任意明文（加密备份导出）。 */
+export async function encryptWithPassword(plain: string, password: string): Promise<BackupEnvelope> {
+  const salt = new Uint8Array(16);
+  crypto.getRandomValues(salt);
+  const kek = await deriveKek(password, salt, PBKDF2_ITERATIONS);
+  const blob = await gcmEncrypt(kek, textEnc.encode(plain));
+  return {
+    kind: 'shinian-backup', v: 1, kdf: 'PBKDF2', hash: 'SHA-256',
+    iterations: PBKDF2_ITERATIONS, salt: toB64(salt), iv: blob.iv, ct: blob.ct,
+  };
+}
+
+/** 用主密码解密备份信封；密码错误或文件损坏抛错。 */
+export async function decryptWithPassword(env: BackupEnvelope, password: string): Promise<string> {
+  if (!env || env.kind !== 'shinian-backup') throw new Error('不是有效的加密备份文件');
+  const salt = fromB64(env.salt);
+  const kek = await deriveKek(password, salt, env.iterations || PBKDF2_ITERATIONS);
+  const pt = await gcmDecrypt(kek, { iv: env.iv, ct: env.ct });
+  return textDec.decode(pt);
+}
+
 /** 创建新保险库：返回信封（持久化）与会话 DEK（内存）。 */
 export async function createVault(
   password: string,

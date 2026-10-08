@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # 依赖漏洞自动修复 PR（npm 生态，含 Capacitor / 生物锁插件 / 构建工具链）
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+  # GitHub Actions 自身版本更新（防止 CI action 漂移）
+  - package-ecosystem: "github-actions"
+    directory: "/.github/workflows"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "github-actions"
+      - "security"

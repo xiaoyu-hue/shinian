@@ -149,6 +149,46 @@ jobs:
         working-directory: android
         run: bash gradlew assembleDebug --no-daemon
 
+      # B5/MobSF · 移动安全框架静态分析（出包后审计 APK）
+      #   扫 manifest 权限 / 硬编码密钥 / 弱加密 / WebView 配置，产出报告 artifact。
+      #   审计性质，不阻塞 APK 上传（continue-on-error）。需 Docker runner（ubuntu-latest 支持）。
+      - name: MobSF 静态分析（APK 安全审计）
+        if: always()
+        continue-on-error: true
+        env:
+          MOBSF_API_KEY: ${{ secrets.MOBSF_API_KEY }}
+        run: |
+          set -e
+          APK=$(find android/app/build/outputs/apk -name '*.apk' | head -1 || true)
+          if [ -z "$APK" ]; then echo "未找到 APK，跳过 MobSF"; exit 0; fi
+          echo ">> 待扫描 APK: $APK"
+          docker run -d --name mobsf -p 8000:8000 -e MOBSF_API_KEY="$MOBSF_API_KEY" opensecurity/mobile-security-framework-mobsf:latest
+          for i in $(seq 1 30); do curl -s -o /dev/null http://localhost:8000 && break; sleep 3; done
+          APIKEY="${MOBSF_API_KEY:-}"
+          if [ -z "$APIKEY" ]; then
+            APIKEY=$(curl -s http://localhost:8000 | grep -oE 'REST API key is: [A-Za-z0-9]+' | awk '{print $5}' || true)
+          fi
+          HASH=$(curl -s -F "file=@$APK" -H "Authorization: $APIKEY" http://localhost:8000/api/v1/upload | jq -r '.hash')
+          curl -s -X POST http://localhost:8000/api/v1/scan -H "Authorization: $APIKEY" \
+            -d "scan_type=apk&file_name=$(basename "$APK")&hash=$HASH" >/dev/null
+          for i in $(seq 1 60); do
+            curl -s -H "Authorization: $APIKEY" "http://localhost:8000/api/v1/report_json?hash=$HASH" -o mobsf-report.json
+            jq -e '.app_name' mobsf-report.json >/dev/null 2>&1 && break
+            sleep 5
+          done
+          SCORE=$(curl -s -X POST http://localhost:8000/api/v1/scorecard -H "Authorization: $APIKEY" -d "hash=$HASH" | jq -r '.security_score' 2>/dev/null || echo n/a)
+          echo ">> MobSF 安全评分: $SCORE"
+          echo ">> 报告大小: $(wc -c < mobsf-report.json) 字节"
+          docker stop mobsf || true
+
+      - name: 上传 MobSF 报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobsf-report
+          path: mobsf-report.json
+          if-no-files-found: ignore
+
       - name: 重命名 APK（带版本号）
         run: |
           if [ "$SIGNED" = "1" ]; then

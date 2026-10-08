@@ -1,0 +1,40 @@
+name: Gitleaks Secret Scan
+
+# 密钥/凭证扫描：扫完整 git 历史 + 工作树，防凭证泄露推上仓库。
+# 直接回应此前 token 明文暴露事件——配合仓库 Settings 的 Secret Scanning
+# + Push Protection（公开仓库免费）形成双保险。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  gitleaks:
+    name: Detect secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          # 仅报警不阻塞 PR（避免历史误报卡死流水线）；严重泄露请人工处理
+          GITLEAKS_ENABLE_UPLOAD_SARIF: "true"
+
+      - name: Upload SARIF to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: "gitleaks"

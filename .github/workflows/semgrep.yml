@@ -1,0 +1,37 @@
+name: Semgrep SAST
+
+# 代码层 SAST：模式匹配扫 JS/TS 的 XSS / 注入 / 弱加密等 OWASP Top 10 模式。
+# 开源规则集免费；跑 PR diff，开发者在评审前看到结果。
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: Scan (owasp-top-ten)
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/owasp-top-ten
+          generateSarif: true
+
+      - name: Upload SARIF to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: "semgrep"

@@ -1,0 +1,37 @@
+name: CodeQL
+
+# GitHub 原生 SAST（语义数据流分析）——公开仓库免费。
+# 覆盖 JS/TS 代码中的注入 / 弱加密 / 鉴权缺陷，结果进入 Security 面板。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # 自定义查询可在此追加；默认 JS/TS 套件已覆盖 OWASP 常见模式
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "codeql/javascript-typescript"

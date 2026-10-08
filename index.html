@@ -189,14 +189,25 @@
           <p class="set-note">实时温度按所选间隔自动更新；切到后台自动暂停，回到前台立即刷新一次。</p>
         </div>
 
+        <div class="set-block" id="encStoreBlock">
+          <label class="set-row" for="encToggle">
+            <span>加密存储</span>
+            <button type="button" class="set-toggle" id="encToggle"
+                    role="switch" aria-checked="false" aria-label="加密存储"></button>
+          </label>
+          <p class="set-note" id="encStoreNote">开启后本地数据用主密码加密（AES-GCM-256），设备丢失也无法读取；需先设置主密码。开启即把现有数据迁为加密。移动端默认强制开启。</p>
+        </div>
+
         <div class="set-block">
           <div class="set-label">数据 · 共 <span id="itemCount">0</span> 条念想</div>
           <div class="set-actions">
             <button type="button" class="set-btn" id="exportCopy">复制备份文本</button>
             <button type="button" class="set-btn" id="exportFile">下载备份文件</button>
+            <button type="button" class="set-btn" id="exportEncFile">下载加密备份</button>
             <button type="button" class="set-btn" id="importBtn">导入恢复</button>
             <button type="button" class="set-btn danger" id="clearBtn">清空全部</button>
           </div>
+          <p class="set-note" id="encBackupNote" hidden>加密备份用主密码加密（AES-GCM-256），即使同步到云盘也不泄露；导入时需输入同一主密码。仅部署版/App 可用。</p>
           <input type="file" id="importFile" accept="application/json,.json" hidden>
           <p class="set-hint" id="setHint" hidden></p>
         </div>

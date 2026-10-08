@@ -1,11 +1,11 @@
 {
   "name": "shinian",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "时念 ShiNian 本地测试与校验环境（网页版自动化测试）",
   "private": true,
   "main": "app.js",
   "scripts": {
-    "test": "node test_wish.js && node test_notif_s5.js && node test_autorefresh.js && node test_intro.js && node test_clouds.js && node test_sunmoon.js && node test_meteor.js && node test_form.js && node test_crypto.js && node test_antitamper.js && node test_secure_store.js && node test_biometric.js",
+    "test": "node test_wish.js && node test_notif_s5.js && node test_autorefresh.js && node test_intro.js && node test_clouds.js && node test_sunmoon.js && node test_meteor.js && node test_form.js && node test_crypto.js && node test_antitamper.js && node test_secure_store.js && node test_biometric.js && node test_crypto_backup.js",
     "build:release": "node tools/build-www.js",
     "typecheck": "tsc --noEmit -p jsconfig.json"
   },

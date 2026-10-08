@@ -947,6 +947,20 @@
     var wtm = document.getElementById('wishTime');
     if (wtm) wtm.value = settings.remind.wishTime;
 
+    // 加密存储开关状态与可见性（方案 A）
+    var et = document.getElementById('encToggle');
+    var eb = document.getElementById('encStoreBlock');
+    if (et && eb) {
+      var cryptoOn = !!(window.ShiNianCore && window.ShiNianCore.crypto && window.ShiNianCore.crypto.encryptWithPassword);
+      if (!cryptoOn) { eb.hidden = true; }            // dev/file:// 无加密层：隐藏开关
+      else if (window.Capacitor) {                    // 移动端强制开启，置灰
+        et.classList.add('on'); et.setAttribute('aria-checked', 'true'); et.disabled = true;
+      } else {
+        var encOn = localStorage.getItem('shinian.enc.enabled') === '1';
+        et.classList.toggle('on', encOn); et.setAttribute('aria-checked', String(encOn)); et.disabled = false;
+      }
+    }
+
     // v0.6.2 天气自动刷新间隔下拉同步
     var wrm = document.getElementById('weatherRefreshMin');
     if (wrm) wrm.value = String(settings.weatherRefreshMin);
@@ -1046,6 +1060,13 @@
     }
     bindToggle('motionToggle', 'motion');
     bindToggle('decorToggle', 'decor');
+    // T13 · 网页端「加密存储」开关：打开 → 建库并迁明文为加密；关闭 → 解锁后迁回明文并清库
+    // 仅部署版/App（window.ShiNianCore.secureStore 存在）可用；移动端（Capacitor）强制开启、不可切换
+    var encToggleEl = document.getElementById('encToggle');
+    if (encToggleEl) encToggleEl.addEventListener('click', function () {
+      var on = localStorage.getItem('shinian.enc.enabled') === '1';
+      if (on) VaultCtl.requestDisableEnc(); else VaultCtl.requestEnableEnc();
+    });
     // v0.7.1 云彩开关：切换后需让云场重新播种（数量/云型随档位变化）
     bindToggle('cloudToggle', 'clouds');
     var ct2 = document.getElementById('cloudToggle');
@@ -1126,6 +1147,16 @@
       haptic(6);
     });
 
+    // 加密存储开关（方案 A）：仅部署版/App 可用（有 ShiNianCore.crypto）；dev/file:// 由 syncSettingsUI 隐藏
+    var encToggle = document.getElementById('encToggle');
+    if (encToggle && window.ShiNianCore && window.ShiNianCore.crypto && window.ShiNianCore.crypto.encryptWithPassword && !window.Capacitor) {
+      encToggle.addEventListener('click', function () {
+        var on = localStorage.getItem('shinian.enc.enabled') === '1';
+        if (!on) { VaultCtl.requestEnableEnc(); closeSettings(); }
+        else { VaultCtl.requestDisableEnc(); closeSettings(); }
+      });
+    }
+
     // 导出 · 复制文本
     document.getElementById('exportCopy').addEventListener('click', function () {
       var items = load();
@@ -1167,58 +1198,101 @@
       var f = fileInput.files && fileInput.files[0];
       if (!f) return;
       var reader = new FileReader();
+      // 导入解析（明文备份与解密后的加密备份共用）
+      function doImport(data) {
+        var incoming = Array.isArray(data) ? data : (data && data.items);
+        if (!Array.isArray(incoming)) { hint('文件格式不对，无法识别'); return; }
+        var cur = load(), have = {};
+        cur.forEach(function (x) { have[x.id] = 1; });
+        var added = 0, dup = 0, bad = 0;
+        incoming.forEach(function (x) {
+          if (!x || !isValidDate(x.date)) { bad++; return; }   // 日期缺失/格式错/日历上不存在 → 跳过
+          var id = x.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+          if (have[id]) { dup++; return; }
+          have[id] = 1;
+          cur.push({ id: id, name: String(x.name || '未命名').slice(0, 30), date: x.date });
+          added++;
+        });
+        // 心愿（v0.5.9）：旧备份无 wishes 字段时跳过，不覆盖现有心愿
+        var wAdded = 0;
+        var wIn = data && data.wishes;
+        if (Array.isArray(wIn) && wIn.length) {
+          var wl = loadWishes(), wh = {};
+          wl.forEach(function (x) { wh[x.id] = 1; });
+          wIn.forEach(function (x) {
+            if (!x || typeof x.text !== 'string' || !x.text) return;
+            var wid = x.id || newWishId();
+            if (wh[wid]) return;
+            wh[wid] = 1;
+            wl.push({
+              id: wid,
+              text: String(x.text).slice(0, 40),
+              done: !!x.done,
+              doneAt: x.doneAt || null,
+              date: (typeof x.date === 'string' && isValidDate(x.date)) ? x.date : null,
+              targetId: x.targetId || null,
+              createdAt: x.createdAt || new Date().toISOString()
+            });
+            wAdded++;
+          });
+          saveWishes(wl);
+        }
+        save(cur); render(); renderWishes(); syncSettingsUI();
+        hint('导入完成：新增 ' + added + ' 条念想' +
+             (wAdded ? '、' + wAdded + ' 个心愿' : '') +
+             (dup ? '，跳过 ' + dup + ' 条重复' : '') +
+             (bad ? '，丢弃 ' + bad + ' 条日期无效' : ''));
+        haptic(12);
+      }
+
       reader.onload = function () {
         try {
           var data = JSON.parse(String(reader.result));
-          var incoming = Array.isArray(data) ? data : (data && data.items);
-          if (!Array.isArray(incoming)) { hint('文件格式不对，无法识别'); return; }
-          var cur = load(), have = {};
-          cur.forEach(function (x) { have[x.id] = 1; });
-          var added = 0, dup = 0, bad = 0;
-          incoming.forEach(function (x) {
-            if (!x || !isValidDate(x.date)) { bad++; return; }   // 日期缺失/格式错/日历上不存在 → 跳过
-            var id = x.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
-            if (have[id]) { dup++; return; }
-            have[id] = 1;
-            cur.push({ id: id, name: String(x.name || '未命名').slice(0, 30), date: x.date });
-            added++;
-          });
-          // 心愿（v0.5.9）：旧备份无 wishes 字段时跳过，不覆盖现有心愿
-          var wAdded = 0;
-          var wIn = data && data.wishes;
-          if (Array.isArray(wIn) && wIn.length) {
-            var wl = loadWishes(), wh = {};
-            wl.forEach(function (x) { wh[x.id] = 1; });
-            wIn.forEach(function (x) {
-              if (!x || typeof x.text !== 'string' || !x.text) return;
-              var wid = x.id || newWishId();
-              if (wh[wid]) return;
-              wh[wid] = 1;
-              wl.push({
-                id: wid,
-                text: String(x.text).slice(0, 40),
-                done: !!x.done,
-                doneAt: x.doneAt || null,
-                date: (typeof x.date === 'string' && isValidDate(x.date)) ? x.date : null,
-                targetId: x.targetId || null,
-                createdAt: x.createdAt || new Date().toISOString()
+          // 加密备份：含 kind='shinian-backup' 信封 → 弹密码解密后导入
+          if (data && data.kind === 'shinian-backup') {
+            var CV = window.ShiNianCore && window.ShiNianCore.crypto;
+            if (!CV || !CV.decryptWithPassword) { hint('当前环境不支持解密备份（需部署版/App）'); fileInput.value = ''; return; }
+            VaultCtl.promptPassword('import', function (pwd) {
+              return CV.decryptWithPassword(data, pwd).then(function (plain) {
+                doImport(JSON.parse(plain));
+                hint('加密备份导入成功');
               });
-              wAdded++;
             });
-            saveWishes(wl);
+            fileInput.value = '';
+            return;
           }
-          save(cur); render(); renderWishes(); syncSettingsUI();
-          hint('导入完成：新增 ' + added + ' 条念想' +
-               (wAdded ? '、' + wAdded + ' 个心愿' : '') +
-               (dup ? '，跳过 ' + dup + ' 条重复' : '') +
-               (bad ? '，丢弃 ' + bad + ' 条日期无效' : ''));
-          haptic(12);
+          doImport(data);
         } catch (e) {
           hint('导入失败：不是有效的备份 JSON');
         }
         fileInput.value = '';
       };
       reader.readAsText(f);
+    });
+
+    // 加密备份导出（仅部署版/App 有 ShiNianCore.crypto 时可用；与明文备份并存）
+    var encBtn = document.getElementById('exportEncFile');
+    var encNote = document.getElementById('encBackupNote');
+    var hasCrypto = !!(window.ShiNianCore && window.ShiNianCore.crypto && window.ShiNianCore.crypto.encryptWithPassword);
+    if (encBtn) encBtn.hidden = !hasCrypto;
+    if (encNote) encNote.hidden = !hasCrypto;
+    if (encBtn) encBtn.addEventListener('click', function () {
+      var CV = window.ShiNianCore.crypto;
+      var items = load(), wishes = loadWishes();
+      if (!items.length && !wishes.length) { hint('还没有念想或心愿可以备份'); return; }
+      VaultCtl.promptPassword('export', function (pwd) {
+        return CV.encryptWithPassword(backupPayload(), pwd).then(function (env) {
+          var blob = new Blob([JSON.stringify(env)], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url; a.download = 'shinian-backup-' + stamp() + '-enc.json';
+          a.addEventListener('click', function (e) { e.stopPropagation(); });
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+          hint('已下载加密备份（.enc.json），导入时需输入主密码');
+          haptic(12);
+        });
+      });
     });
 
     // 清空（二次确认）
@@ -1554,30 +1628,43 @@
     var submitEl = document.getElementById('vaultSubmit');
     var bioEl = document.getElementById('vaultBio');
     var booted = false;
+    var pendingCb = null;
+    var pendingEnableEnc = false;   // 设置里开启加密存储：setup 成功后把明文迁为加密
+    var pendingDisableEnc = false;  // 设置里关闭加密存储：unlock 成功后把加密迁回明文并清 vault
 
     function fail(msg) { errEl.textContent = msg; errEl.hidden = false; }
     function clearErr() { errEl.hidden = true; errEl.textContent = ''; }
 
-    function open(mode) {
+    function open(mode, cb) {
       clearErr();
       modal.dataset.mode = mode;
+      pendingCb = (mode === 'export' || mode === 'import') ? cb : null;
       pwdEl.value = ''; pwd2El.value = '';
       pwdEl.hidden = false; pwd2El.hidden = (mode !== 'setup');
-      // 仅当原生层暴露 biometric 且设备已支持并登记时才显示生物锁按钮（B2）
+      // 仅 setup/unlock 且原生层暴露 biometric 并登记时才显示生物锁按钮（B2）
       var bio = window.ShiNianCore && window.ShiNianCore.biometric;
-      bioEl.hidden = !(bio && bio.isSupported && bio.isSupported() && bio.isEnrolled && bio.isEnrolled());
+      bioEl.hidden = !((mode === 'setup' || mode === 'unlock') && bio && bio.isSupported && bio.isSupported() && bio.isEnrolled && bio.isEnrolled());
       if (mode === 'setup') {
         titleEl.textContent = '时念 · 设置主密码';
         subEl.textContent = '为你的念想设置主密码（本地加密、无法找回，请务必牢记）';
         pwdEl.placeholder = '主密码（至少 6 位）';
         pwd2El.placeholder = '再次输入确认';
         submitEl.textContent = '创建保险库';
-      } else {
+      } else if (mode === 'unlock') {
         titleEl.textContent = '时念 · 解锁';
         subEl.textContent = '输入主密码以查看你的念想';
         pwdEl.placeholder = '主密码';
-        pwd2El.placeholder = '再次输入确认';
         submitEl.textContent = '解锁';
+      } else if (mode === 'export') {
+        titleEl.textContent = '时念 · 加密备份';
+        subEl.textContent = '输入主密码以加密导出（与解锁密码相同）';
+        pwdEl.placeholder = '主密码';
+        submitEl.textContent = '加密并下载';
+      } else if (mode === 'import') {
+        titleEl.textContent = '时念 · 解密备份';
+        subEl.textContent = '输入主密码以解密此备份文件';
+        pwdEl.placeholder = '主密码';
+        submitEl.textContent = '解密并导入';
       }
       modal.hidden = false;
       setTimeout(function () { try { pwdEl.focus(); } catch (e) {} }, 30);
@@ -1588,10 +1675,84 @@
       close();
       if (!booted) { booted = true; boot(); }
       // 已 booted（重锁后重开）：cache 已被 re-prime，DOM 仍准确，无需重 render
+      if (pendingEnableEnc) {
+        pendingEnableEnc = false;
+        localStorage.setItem('shinian.enc.enabled', '1');
+        migratePlaintextToEncrypted();
+        syncSettingsUI();
+        hint('已开启加密存储，本地数据已加密');
+        haptic(12);
+      }
+    }
+
+    // 开启加密存储：把现有明文数据改写为加密（dek 已在内存，isReady 为真），并删除明文副本
+    function migratePlaintextToEncrypted() {
+      var S = SS(); if (!S || !S.isReady()) return;
+      S.KNOWN_KEYS.forEach(function (k) {
+        try {
+          var raw = localStorage.getItem(k);
+          if (raw == null) return;
+          S.set(k, JSON.parse(raw));   // 加密写入（cache 同步、落盘异步且内部已容错）
+          localStorage.removeItem(k);  // 源明文已迁走，删除明文副本，避免设备丢失仍可读
+        } catch (e) { if (window.console) console.warn('[时念] 迁移加密失败（保留明文）:', k, e); }
+      });
+    }
+    // 关闭加密存储：用内存 DEK 解密现有数据回写明文，再清 vault 信封与密文 blob
+    function migrateEncryptedToPlaintextAndClear() {
+      var S = SS(); if (!S || !S.isReady()) return false;
+      var ok = true;
+      S.KNOWN_KEYS.forEach(function (k) {
+        try {
+          var val = S.get(k); // 解密后的明文（来自内存 cache）
+          if (val !== null && val !== undefined) localStorage.setItem(k, JSON.stringify(val));
+        } catch (e) { ok = false; if (window.console) console.warn('[时念] 迁移明文失败:', k, e); }
+      });
+      try {
+        localStorage.removeItem('shinian.vault.v1');
+        localStorage.removeItem('shinian.vault.bio.v1');
+        S.KNOWN_KEYS.forEach(function (k) { localStorage.removeItem(k + '__enc'); });
+      } catch (e) { ok = false; }
+      S.lock(); // 清内存 DEK，使 Store 回落明文
+      return ok;
     }
 
     function submit() {
       var S = SS();
+      var mode = modal.dataset.mode;
+      // 加密备份导出：取主密码回调加密
+      if (mode === 'export' && pendingCb) {
+        var pe = pwdEl.value; if (!pe) { fail('请输入主密码'); return; }
+        submitEl.disabled = true;
+        Promise.resolve().then(function () { return pendingCb(pe); })
+          .then(function () { submitEl.disabled = false; close(); })
+          .catch(function (e) { submitEl.disabled = false; fail((e && e.message) || '加密失败'); });
+        return;
+      }
+      // 加密备份导入：取主密码回调解密
+      if (mode === 'import' && pendingCb) {
+        var pi = pwdEl.value; if (!pi) { fail('请输入主密码'); return; }
+        submitEl.disabled = true;
+        Promise.resolve().then(function () { return pendingCb(pi); })
+          .then(function () { submitEl.disabled = false; close(); })
+          .catch(function () { submitEl.disabled = false; fail('密码错误或文件损坏'); });
+        return;
+      }
+      // 关闭加密存储：先解锁读取加密数据，再迁回明文并清除 vault
+      if (mode === 'unlock' && pendingDisableEnc) {
+        var pd = pwdEl.value; if (!pd) { fail('请输入主密码'); return; }
+        submitEl.disabled = true;
+        S.unlock(pd).then(function () {
+          submitEl.disabled = false;
+          var ok = migrateEncryptedToPlaintextAndClear();
+          pendingDisableEnc = false;
+          localStorage.setItem('shinian.enc.enabled', '0');
+          close();
+          syncSettingsUI(); render(); renderWishes();
+          hint(ok ? '已关闭加密存储，数据已转回明文' : '已关闭加密存储（部分数据迁移失败，请检查）');
+          haptic(12);
+        }).catch(function () { submitEl.disabled = false; fail('主密码错误'); });
+        return;
+      }
       if (!S) { onSuccess(); return; } // dev 模式无加密层，直接进
       if (modal.dataset.mode === 'setup') {
         var p1 = pwdEl.value, p2 = pwd2El.value;
@@ -1633,12 +1794,32 @@
 
     function start() {
       var S = SS();
-      if (!S) { booted = true; boot(); return; } // dev/file://：无加密层，直接启动
-      if (S.needsSetup()) open('setup');
-      else open('unlock');
+      if (!S) { booted = true; boot(); return; } // dev/file://：无加密层，直接启动（明文）
+      // 移动端（Capacitor）：始终强制加密存储，忽略网页端开关
+      if (window.Capacitor) {
+        if (S.needsSetup()) open('setup'); else open('unlock');
+        return;
+      }
+      // 网页端（部署版）：按「启用加密存储」开关决定；默认关 → 直接启动（明文）
+      if (localStorage.getItem('shinian.enc.enabled') !== '1') { booted = true; boot(); return; }
+      if (S.needsSetup()) open('setup'); else open('unlock');
     }
 
-    return { start: start };
+    return {
+      start: start,
+      promptPassword: function (mode, cb) { open(mode, cb); },
+      requestEnableEnc: function () {
+        var S = SS();
+        if (!S) { if (typeof hint === 'function') hint('当前环境不支持加密存储，请用部署版或 App'); return; }
+        pendingEnableEnc = true;
+        if (S.needsSetup()) open('setup'); else open('unlock'); // 库已存在则解锁复用，否则建库
+      },
+      requestDisableEnc: function () {
+        var S = SS();
+        if (!S || S.needsSetup()) { localStorage.setItem('shinian.enc.enabled', '0'); return; } // 无库无需处理
+        pendingDisableEnc = true; open('unlock');
+      }
+    };
   })();
 
   if (document.readyState === 'loading') {

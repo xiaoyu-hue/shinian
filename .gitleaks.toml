@@ -1,0 +1,20 @@
+# Gitleaks 配置：扩展官方默认规则，放行测试 fixture 与文档中的示例值，
+# 避免历史误报卡死流水线。真实凭证泄露仍会被默认规则捕获。
+[extend]
+useDefault = true
+
+[allowlist]
+description = "放行测试 fixture、文档示例值、构建产物与第三方目录中的非真实密钥"
+paths = [
+  # 测试文件中的假 token / 假密码 / mock 值
+  '''.*/test_.*\.js$''',
+  '''.*/test/.*''',
+  # 文档中的示例与说明文本
+  '''.*/_docs/.*''',
+  '''.*/README\.md$''',
+  '''.*/CHANGELOG\.md$''',
+  # 构建产物与依赖
+  '''.*/www/.*''',
+  '''.*/node_modules/.*''',
+  '''.*/android/.*''',
+]
