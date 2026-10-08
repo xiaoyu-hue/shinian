@@ -54,6 +54,14 @@
 > 在主站记下的念想，打开备用站是看不到的（反之亦然）——这不是数据丢失，回到原来那个网址就能看到。
 > 建议固定用主站，只在主站打不开时才临时用备用站。
 
+## 📱 安卓 App 下载
+
+正式签名 APK 随版本发布，在 [Releases](https://github.com/xiaoyu-hue/shinian/releases) 页对应版本下下载（如 [v1.1.1 直链](https://github.com/xiaoyu-hue/shinian/releases/download/v1.1.1/shinian-v1.1.1-release.apk)）：
+
+- 安装时若提示「未知来源应用」，允许一次即可；同签名旧版可直接覆盖升级，数据保留
+- App 版相比网页版多出：**加密保险库强制开启**（AES-GCM-256 + 主密码 / 生物锁 / 应用锁三重解锁）、**喝水与倒数日系统通知提醒**、**离线可用**
+- CI 每次构建均先跑 13 套 211 项测试与类型检查，签名密钥仅存在于 GitHub Secrets，不入库
+
 ## 🎨 设计语言：液态玻璃 × 四季 × 时刻
 
 视觉主体延续自作者的[个人主站](https://xiaoyu-hue.github.io)液态玻璃体系，并升级为「流动」形态：

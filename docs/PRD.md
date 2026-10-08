@@ -187,3 +187,17 @@
 | 2026-10-06 | v0.6.2 交付 | 天气温度自动刷新（v0.2 天气维度内增强）：设置可选间隔（关闭 / 5 / 10 / 15 / 30 分钟，默认 5）按间隔自动拉取实时温度（绕过 15 分钟缓存）；切后台暂停、回前台立即刷新；手动 ↻ 刷新保留；失败静默降级；附带 `?wrf=秒数` 调试钩子。同步 README / CHANGELOG / PRD；未触发 APK 构建（用户暂不需要正式包）。发布 [v0.6.2](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.2) |
 | 2026-10-06 | v0.6.3 交付 | 审查修复（稳定性 / 安全 / 可访问性）：自动刷新失败不再清空温度（保留上次有效温度）；新增 CSP 纵深防御、键盘焦点环（WCAG 2.4.7）、自动刷新单测接入 npm test、部署清单补齐 5 个被引用 JS（weather/sky/season/lunar/cities）；save() 容错对齐、关闭装饰即时停效果、cities.js 死引用清理。同步 README / CHANGELOG / PRD。发布 [v0.6.3](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.3) |
 | 2026-10-06 | v0.6.6 交付 | 云彩体系深度优化（真实云物理 + 移动/桌面分级）：深度重写 `assets/clouds.js`——真实云物理（多层视差 + 积云/层云/风暴/雾/卷云真实云型 + 太阳方位光照明暗）+ 天气联动增强（晴→积云 / 阴雾→层云 / 雨雷→风暴）+ 移动/桌面深度分级（移动端 2 层 DPR1.5/0.62×/24fps，桌面端 3 层 DPR2/1.0×/30fps）；调用方消费 `ShiNianClouds.config()`；`test_clouds.js` 增至 24 项断言。同步 README / CHANGELOG / PRD。发布 [v0.6.6](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.6) |
+
+| 2026-10-06 | v0.6.7 交付 | 云彩观感调参（响应「云太多太大太黑」）：天气浓度 / 朵数 / 半径 / 透明度整体下调精修。发布 [v0.6.7](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.7) |
+| 2026-10-06 | v0.6.8 交付 | 云色热修（P0 纯黑云根因：tintAt 返回对象被当数组消费 → 全部渲染为黑色；夜间暖棕：黄金时刻误判）+ 防回归颜色断言。发布 [v0.6.8](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.6.8) |
+| 2026-10-07 | v0.7.0 交付 | 天穹重构：云彩引擎 v3（fBm 噪声场 + 密度阈值 + 域翘曲，根治 v2 聚团）+ 日月体系（真实高度角 / 方位角 / 月相，SunCalc vendored）+ 火烧云光照。发布 [v0.7.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.7.0) |
+| 2026-10-07 | v0.7.1 交付 | 云彩可调：设置新增云开关 / 云量档位（auto 跟随天气）/ 空窗期节奏；test_clouds 扩至 24 项。发布 [v0.7.1](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.7.1) |
+| 2026-10-07 | v0.7.2 交付 | 开源合规与文档补齐：依赖登记补 SunCalc；修复 lunar.js vendored 许可头缺失；参考借鉴登记（Inigo Quilez / Cloud Sky / MDN 等）。发布 [v0.7.2](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.7.2) |
+| 2026-10-07 | v0.7.3 交付 | 流星自定义间隔（真实 / 30s / 12s / 自定义 5–300s ±30% 抖动 + 必遇一次）+ 开源致敬补全 + 文档勘误。发布 [v0.7.3](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.7.3) |
+| 2026-10-07 | v0.7.4 交付 | 审查整改：HTML section 配平、iOS 输入字号 16px、城市存储校验、日期合法性拦截、无障碍下拉语义等 8 项；CI 接入 npm test。发布 [v0.7.4](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.7.4) |
+| 2026-10-07 | v0.7.5 交付 | 通知时区与系统设置对齐；自动刷新测试加固。发布 [v0.7.5](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.7.5) |
+| 2026-10-07 | v0.7.6 交付 | 第三次审查整改：CI 构建步骤硬失败修复、日期校验、流星点击失效修复、CHANGELOG 自相矛盾订正、npm test 挂起修复；测试 8 套 145 项。发布 [v0.7.6](https://github.com/xiaoyu-hue/shinian/releases/tag/v0.7.6) |
+| 2026-10-08 | v1.0.0 交付 | 安全加固主版本：B1 本地数据加密保险库（AES-GCM-256 + PBKDF2 21 万轮）+ B2 生物锁（Android Keystore）+ B2 应用锁 + B3 混淆 / 运行时反篡改 RASP + B4 WebView 硬化；架构分层升级（src/ TS 严格模式 + esbuild + 混淆发布管线）。发布 [v1.0.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.0.0) |
+| 2026-10-08 | v1.0.1 交付 | B3 收口 + 安全区与体验修复 + 审计文档勘误。发布 [v1.0.1](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.0.1) |
+| 2026-10-08 | v1.1.0 交付 | 免费安全审计（CodeQL / Gitleaks / Semgrep / MobSF / Dependabot + Secret Scanning）+ 网页端加密存储开关（方案 A）+ 加密备份导出 / 导入；测试 13 套 211 项。发布 [v1.1.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.1.0) |
+| 2026-10-08 | v1.1.1 交付 | 二次审查整改：P1 迁移竞态根治（数据丢失）+ P1 应用锁 2 分钟宽限期与开关 + 自愈式键发现 + 落盘队列化 + flaky 测试修稳 + 清理（删 `_cfg/` 等）；首次 Release 附签名 APK；E2E 实测 6 场景全过。发布 [v1.1.1](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.1.1) |
