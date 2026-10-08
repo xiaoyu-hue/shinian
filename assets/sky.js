@@ -84,6 +84,10 @@
   function hex2rgb(h) {
     return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   }
+  // v1.1.3：物理天空色混合用到 clamp——此前 sky.js 没有此函数（只在 clouds.js 私有
+  // 作用域里），bundle 打包后运行时 ReferenceError 会中断整条 bundle 执行链
+  // （sky.js 之后的 sunmoon/clouds/intro/app 全部不加载，页面只剩默认夜空），必须定义在本文件。
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function mix(c1, c2, t) {
     return [Math.round(lerp(c1[0], c2[0], t)),
@@ -119,6 +123,86 @@
     return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
   }
 
+  // v1.1.3 物理天空色（B 方案）：紧凑单次散射（Rayleigh + Mie）。
+  // 数学参考 wwwtyro/glsl-atmosphere（Unlicense 公共领域，GitHub API 实测确认），
+  // 移植为 CPU 采样版：对「天顶方向」与「地平线方向」各积分一次（16 步视线 × 8 步光深），
+  // paint() 每分钟调用 2 次毫无压力。输出与艺术锚点做 30% 混合——物理负责「准」，
+  // 手调锚点负责「好看」，两者互补而非替代（纯物理色在风格化场景会发灰）。
+  var ATMOS = (function () {
+    var Re = 6360e3, Ra = 6420e3, Hr = 7994, Hm = 1200;
+    var Br = [5.8e-6, 13.5e-6, 33.1e-6], Bm = 21e-6, SUN_I = 22;
+    function norm(v) { var l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; }
+    function raySphereFar(orig, dir, radius) {
+      // |orig + t·dir| = radius 的较大根（视线从地表射向大气层顶部）
+      var b = 2 * (orig[0] * dir[0] + orig[1] * dir[1] + orig[2] * dir[2]);
+      var c = orig[0] * orig[0] + orig[1] * orig[1] + orig[2] * orig[2] - radius * radius;
+      var disc = b * b - 4 * c;
+      if (disc < 0) return -1;
+      return (-b + Math.sqrt(disc)) / 2;
+    }
+    function opticalDepth(orig, dir, sunDir) {
+      // 沿太阳方向到大气顶的密度积分（8 步），分 Rayleigh / Mie 两份
+      var tEnd = raySphereFar(orig, sunDir, Ra);
+      if (tEnd < 0) return null;                       // 太阳方向被地球遮挡
+      var odR = 0, odM = 0, seg = tEnd / 8;
+      for (var i = 0; i < 8; i++) {
+        var p = [orig[0] + dir[0] * seg * (i + 0.5),
+                 orig[1] + dir[1] * seg * (i + 0.5),
+                 orig[2] + dir[2] * seg * (i + 0.5)];
+        var hgt = Math.hypot(p[0], p[1], p[2]) - Re;
+        if (hgt < 0) return null;
+        odR += Math.exp(-hgt / Hr) * seg;
+        odM += Math.exp(-hgt / Hm) * seg;
+      }
+      return [odR, odM];
+    }
+    function scatter(sunDir, viewDir) {
+      var orig = [0, Re + 2, 0];                       // 观察者：地表
+      var tMax = raySphereFar(orig, viewDir, Ra);
+      if (tMax <= 0) return null;
+      var step = tMax / 16, odR = 0, odM = 0;
+      var sum = [0, 0, 0], mu = viewDir[0] * sunDir[0] + viewDir[1] * sunDir[1] + viewDir[2] * sunDir[2];
+      var phR = 3 / (16 * Math.PI) * (1 + mu * mu);    // Rayleigh 相位
+      var g = 0.76, phM = 3 / (8 * Math.PI) * ((1 - g * g) * (1 + mu * mu)) /
+                        ((2 + g * g) * Math.pow(1 + g * g - 2 * g * mu, 1.5)); // Mie HG 相位
+      for (var i = 0; i < 16; i++) {
+        var p = [orig[0] + viewDir[0] * step * (i + 0.5),
+                 orig[1] + viewDir[1] * step * (i + 0.5),
+                 orig[2] + viewDir[2] * step * (i + 0.5)];
+        var hgt = Math.hypot(p[0], p[1], p[2]) - Re;
+        var dR = Math.exp(-hgt / Hr) * step, dM = Math.exp(-hgt / Hm) * step;
+        odR += dR; odM += dM;
+        var odSun = opticalDepth(p, sunDir, sunDir);   // 该点到太阳的光深
+        if (!odSun) continue;                          // 阴影区（地球遮挡）
+        for (var ch = 0; ch < 3; ch++) {
+          var att = Math.exp(-(Br[ch] * (odR + odSun[0]) + Bm * (odM + odSun[1])));
+          sum[ch] += (Br[ch] * phR + Bm * phM) * att * dR;
+        }
+      }
+      return sum;
+    }
+    function tonemap(c) {
+      // 线性 HDR → sRGB：简单 Reinhard 式压暗 + 伽马，曝光系数按正午天顶校准
+      var out = [];
+      for (var i = 0; i < 3; i++) {
+        var v = 1 - Math.exp(-c[i] * SUN_I);
+        v = Math.pow(Math.max(0, Math.min(1, v)), 1 / 2.2);
+        out.push(Math.round(v * 255));
+      }
+      return out;
+    }
+    return {
+      sky: function (sunAltDeg) {
+        var alt = Math.max(-6, Math.min(90, sunAltDeg)) * Math.PI / 180;
+        var sunDir = norm([0, Math.sin(alt), Math.cos(alt)]);
+        var top = scatter(sunDir, norm([0, 1, 0.001]));
+        var bottom = scatter(sunDir, norm([0, 0.30, 0.954]));
+        if (!top || !bottom) return null;
+        return { top: tonemap(top), bottom: tonemap(bottom) };
+      }
+    };
+  })();
+
   function paint() {
     var h = nowHours();
     // 找到相邻锚点
@@ -134,6 +218,21 @@
 
     var top = mix(hex2rgb(a.top), hex2rgb(b.top), t);
     var bottom = mix(hex2rgb(a.bottom), hex2rgb(b.bottom), t);
+
+    // v1.1.3 物理天空色混合（B 方案）：以真实太阳高度角驱动 Rayleigh/Mie 单次散射，
+    // 与艺术锚点 30% 融合——正午更透、黄昏更暖的物理正确色相微调；
+    // 太阳 -6°（民用晨昏影）以下渐隐至 0，夜间完全交给艺术锚点。
+    var sm = window.ShiNianSunMoon && window.ShiNianSunMoon.get();
+    var sunAlt = sm ? sm.sun.altitudeDeg : clamp((h - 6) / 12, 0, 1) * 60;
+    if (sunAlt > -6) {
+      var phys = ATMOS.sky(sunAlt);
+      if (phys) {
+        var pk = 0.30 * clamp((sunAlt + 6) / 8, 0, 1);
+        top = mix(top, phys.top, pk);
+        bottom = mix(bottom, phys.bottom, pk);
+      }
+    }
+
     var glow = [
       Math.round(lerp(a.glow[0], b.glow[0], t)),
       Math.round(lerp(a.glow[1], b.glow[1], t)),

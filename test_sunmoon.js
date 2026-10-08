@@ -17,7 +17,7 @@ function ok(label, cond, extra) {
 function mockCtx() {
   return {
     globalAlpha: 1, fillStyle: '',
-    save() {}, restore() {}, beginPath() {}, arc() {}, fill() {},
+    save() {}, restore() {}, beginPath() {}, clip() {}, arc() {}, fill() {},
     ellipse() {}, closePath() {}, fillRect() {},
     createRadialGradient() { return { addColorStop() {} }; },
     createLinearGradient() { return { addColorStop() {} }; },

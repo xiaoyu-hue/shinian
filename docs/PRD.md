@@ -202,3 +202,4 @@
 | 2026-10-08 | v1.1.0 交付 | 免费安全审计（CodeQL / Gitleaks / Semgrep / MobSF / Dependabot + Secret Scanning）+ 网页端加密存储开关（方案 A）+ 加密备份导出 / 导入；测试 13 套 211 项。发布 [v1.1.0](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.1.0) |
 | 2026-10-08 | v1.1.1 交付 | 二次审查整改：P1 迁移竞态根治（数据丢失）+ P1 应用锁 2 分钟宽限期与开关 + 自愈式键发现 + 落盘队列化 + flaky 测试修稳 + 清理（删 `_cfg/` 等）；首次 Release 附签名 APK；E2E 实测 6 场景全过。发布 [v1.1.1](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.1.1) |
 | 2026-10-08 | v1.1.2 交付 | 真机反馈四连修：开场动画与锁屏时序解耦、APK 专属图标恢复、设置内检查更新（GitHub Releases）、APK 版本号注入（versionName/versionCode）。发布 [v1.1.2](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.1.2) |
+| 2026-10-08 | v1.1.3 交付 | 云彩拟真光照（Beer 透光 + 银边 + fire 窗口修复）+ sparse 档修复 + 物理天空色（Rayleigh/Mie 30% 融合）+ 日月升级（月海 / 地照 / Mie 光幕）。发布 [v1.1.3](https://github.com/xiaoyu-hue/shinian/releases/tag/v1.1.3) |

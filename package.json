@@ -1,6 +1,6 @@
 {
   "name": "shinian",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "时念 ShiNian 本地测试与校验环境（网页版自动化测试）",
   "private": true,
   "main": "app.js",

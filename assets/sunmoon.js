@@ -126,16 +126,39 @@
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(x, y, glowR, 0, 6.2832); ctx.fill();
 
+    // v1.1.3：Mie 前向散射大光幕——真实太阳的光晕延伸至很大天区，
+    // 低角度时散射更强、光幕更大（大气路径变长的物理结果）
+    var mieR = (150 + 130 * low) * glowScale;
+    var gm = ctx.createRadialGradient(x, y, 0, x, y, mieR);
+    gm.addColorStop(0, 'rgba(255,' + Math.round(225 - 45 * low) + ',' + Math.round(185 - 85 * low) + ',' + (0.10 + 0.10 * low).toFixed(3) + ')');
+    gm.addColorStop(0.55, 'rgba(255,' + Math.round(205 - 50 * low) + ',' + Math.round(150 - 80 * low) + ',' + (0.04 + 0.05 * low).toFixed(3) + ')');
+    gm.addColorStop(1, 'rgba(255,190,130,0)');
+    ctx.fillStyle = gm;
+    ctx.beginPath(); ctx.arc(x, y, mieR, 0, 6.2832); ctx.fill();
+
     var coreR = 15 + 5 * low;
+    // v1.1.3：地平线附近大气折射使日面轻微扁化（alt<8° 渐显，压扁至 7%）
+    var squash = 1 - 0.07 * clamp(1 - altDeg / 8, 0, 1);
     var g2 = ctx.createRadialGradient(x, y, 0, x, y, coreR * 2.4);
     g2.addColorStop(0, coreC);
     g2.addColorStop(0.5, coreC.replace(',1)', ',0.85)'));
     g2.addColorStop(1, 'rgba(255,220,170,0)');
     ctx.fillStyle = g2;
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(1, squash); ctx.translate(-x, -y);
     ctx.beginPath(); ctx.arc(x, y, coreR * 2.4, 0, 6.2832); ctx.fill();
+    ctx.restore();
   }
 
-  function drawMoon(ctx, x, y, r, phase, waxing, alpha) {
+  // v1.1.3：月面「月海」暗斑表（归一化坐标，对应真实月面雨海/静海/危海等大势布局，
+  // 固定值保证每帧一致；绘制在亮面 clip 内，只在受光区可见）
+  var MARIA = [
+    [-0.28, -0.30, 0.34, 0.16], [0.18, -0.34, 0.26, 0.13], [0.42, 0.05, 0.20, 0.11],
+    [-0.10, 0.28, 0.24, 0.10], [0.05, -0.02, 0.16, 0.09]
+  ];
+  function drawMoon(ctx, x, y, r, phase, waxing, alpha, altDeg) {
+    var altK = clamp(1 - (altDeg || 30) / 18, 0, 1);  // 越近地平线越暖（大气消光）
+    var brightC = 'rgb(' + Math.round(242 + 13 * altK) + ',' + Math.round(246 - 12 * altK) + ',' + Math.round(255 - 42 * altK) + ')';
     ctx.save();
     // 柔光晕
     var g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2);
@@ -143,14 +166,15 @@
     g.addColorStop(1, 'rgba(226,236,255,0)');
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, 6.2832); ctx.fill();
-    // 暗面底盘（隐约可见）
-    ctx.globalAlpha = alpha * 0.30;
+    // 暗面底盘（隐约可见）；v1.1.3：细月牙时「地照」增强——地球反光照亮月暗面
+    var crescent = clamp((phase - 0.78) / 0.22, 0, 1) + clamp((0.22 - phase) / 0.22, 0, 1);
+    ctx.globalAlpha = alpha * (0.30 + 0.16 * crescent);
     ctx.fillStyle = '#b9c6dd';
     ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
     // 亮面（真实盈亏：半圆 + 终结线椭圆）
     var e = Math.cos(phase * 2 * Math.PI);            // 1 新月 .. -1 满月
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#f2f6ff';
+    ctx.fillStyle = brightC;
     ctx.beginPath();
     if (waxing) {
       ctx.arc(x, y, r, -Math.PI / 2, Math.PI / 2, false);                       // 右半圆
@@ -160,6 +184,16 @@
       ctx.ellipse(x, y, Math.abs(e) * r, r, 0, -Math.PI / 2, Math.PI / 2, e > 0);
     }
     ctx.closePath(); ctx.fill();
+    // v1.1.3：月海暗斑——clip 到亮面路径内绘制，只在受光区可见、形状不越界
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = 'rgba(96,108,128,1)';
+    for (var mi = 0; mi < MARIA.length; mi++) {
+      var m = MARIA[mi];
+      ctx.globalAlpha = alpha * m[3];
+      ctx.beginPath(); ctx.arc(x + m[0] * r, y + m[1] * r, m[2] * r, 0, 6.2832); ctx.fill();
+    }
+    ctx.restore();
     ctx.restore();
   }
 
@@ -188,7 +222,7 @@
       // 日月交替：太阳在地平线上时月亮淡出
       var cross = clamp(1 - (st.sun.altitudeDeg + 4) / 10, 0, 1);
       drawMoon(ctx, mp.x, mp.y, 17, st.moon.phase, st.moon.waxing,
-               cross * clamp(st.moon.altitudeDeg / 12, 0.3, 1));
+               cross * clamp(st.moon.altitudeDeg / 12, 0.3, 1), st.moon.altitudeDeg);
     }
   }
 

@@ -97,8 +97,12 @@
                     : mix3(FIRE_MID, FIRE_TOP, (hf - 0.5) / 0.5);
   }
   // 火烧云强度：太阳高度角越接近地平线越强（峰值约 +2°）
+  // v1.1.3 修触发窗口 bug：原 Math.abs(sun.alt - 2) 使太阳下山后（alt 为负）火烧云仍在
+  // 烧（alt=-8° 时强度仍 0.16）——暮色云被染成孤立橙团（用户可见的"贴纸感"根源）。
+  // 物理上民用暮光（-6°）结束火烧云即熄灭；此处 -4° 熄灭、+9° 以上（白昼）不触发。
   function fireAmount(sun) {
-    var f = 1 - Math.abs(sun.alt - 2) / 13;
+    if (sun.alt < -4 || sun.alt > 9) return 0;
+    var f = 1 - Math.abs(sun.alt - 2) / 7;
     return f > 0 ? Math.pow(f, 1.25) : 0;
   }
 
@@ -268,6 +272,10 @@
       for (var r = 0; r < L.rows; r++) {
         for (var c = 0; c < cols; c++) {
           if (hash2(c, r, seed + li * 97) > cov) continue;      // 空格子 = 蓝天留白
+          // v1.1.3 修 sparse 失效遗留 bug：格子少时 cov 乘率删不掉格子（实测 sparse 与
+          // auto 条目数同为 6），档位形同虚设。改为乘率同时作用于云体尺寸与透明度——
+          // sparse 云更小更透、dense 云更大更实，三档观感立现且逐帧确定。
+          var sizeMul = 0.55 + 0.45 * Math.min(cm.mul, 1.6);
           var hx = hash2(c, r, seed + 311 + li * 17);
           var hy = hash2(c, r, seed + 727 + li * 23);
           var hz = hash2(c, r, seed + 991 + li * 29);
@@ -282,8 +290,10 @@
             layer: id, kind: kind,
             x: (c + 0.15 + hx * 0.7) / cols,
             y: band[0] + hy * (band[1] - band[0]),
-            rx: rrx, ry: rry,
-            speed: L.speed, alpha: L.alpha, haze: L.haze, erode: L.erode, thr: L.thr,
+            rx: rrx * sizeMul, ry: rry * sizeMul,
+            speed: L.speed,
+            alpha: L.alpha * Math.min(1, 0.55 + 0.45 * cm.mul),
+            haze: L.haze, erode: L.erode, thr: L.thr,
             band: band,
             seed: (hash2(c, r, seed + 555 + li * 41) * 1000) | 0
           });
@@ -395,26 +405,36 @@
         if (a <= 0.004) continue;                 // 低于阈值 = 蓝天留白
 
         // 光照
+        // v1.1.3 拟真光照（工艺来源：Horizon Zero Dawn GDC 体积云三件套的 2D 像素场近似，
+        //   Beer-Lambert 透光 / HG 前向散射银边 / 云底阴影；调研记录见 CHANGELOG v1.1.3）：
+        //   光学厚度 optical ≈ 密度 d × 云内路径（越靠云底路径越长、越背光路径越长），
+        //   Beer 项 exp(-k·optical) 调制受光强度 → 厚处/底部/背光自然变暗，体积感由此而来。
         var hf = clamp((1 - vy) * 0.5, 0, 1);     // 云内高度：1=顶 0=底
         var face = 0.5 + 0.5 * (ux * sunDir);     // 迎光侧 1 / 背光侧 0
+        var optical = d * (1.1 + 1.8 * (1 - hf)) * (1 + 0.6 * (1 - face));
+        var beer = Math.exp(-0.9 * optical);      // Beer-Lambert 透光率
         var lit;
-        if (!sun.above) lit = 0.42;                       // 夜间：无方向光
-        else if (sun.alt > 10) lit = mix(0.30, 1.0, hf);  // 白天：顶亮底暗
-        else lit = mix(0.95, 0.45, hf);                   // 低太阳：底亮顶暗
+        if (!sun.above) lit = 0.42;                       // 夜间：无方向光（不加 Beer，保持已调校的夜云观感）
+        else if (sun.alt > 10) lit = mix(0.30, 1.0, hf) * (0.40 + 0.60 * beer);  // 白天：顶亮底暗 + 透光衰减
+        else lit = mix(0.95, 0.45, hf) * (0.50 + 0.50 * beer);                   // 低太阳：底亮顶暗 + 透光衰减
         lit *= 0.60 + 0.40 * face;
         lit = clamp(lit, 0, 1);
         var col = mix3(shadowC, litC, lit);
 
         // 火烧云：底橙红 → 中粉 → 顶紫蓝
         if (fireOn) {
-          var fc = fireColor(hf);
-          col = mix3(col, fc, fire * (0.30 + 0.55 * (1 - hf)) * (0.55 + 0.45 * face));
+          // v1.1.3 调参：fireColor 向天空底色回掺 30%——火烧云必须与暮色天空同色系渐变，
+          // 否则整朵云染色成孤立橙团浮在粉紫天上（实测像贴纸），融合感优先于饱和度
+          var fc = mix3(fireColor(hf), bt, 0.30);
+          col = mix3(col, fc, fire * (0.15 + 0.32 * (1 - hf)) * (0.55 + 0.45 * face));
         }
-        // 银边效应：薄云迎光边缘透光发亮
+        // 银边效应（HG 前向散射的 2D 近似）：薄云迎光边缘透光发亮；
+        //   v1.1.3：低太阳时前向散射更强（真实逆光观感），叠加火光时的暖银边
         var edge = 1 - ss(thr, thr + 0.26, d);
-        if (edge > 0.01 && face > 0.35) {
+        if (edge > 0.01 && face > 0.45) {
+          var silverK = sun.above ? (0.38 + 0.15 * (1 - clamp(sun.alt / 25, 0, 1))) : 0.22;
           col = mix3(col, fireOn ? [255, 226, 190] : [255, 250, 240],
-                     edge * face * (sun.above ? 0.45 : 0.25));
+                     edge * face * silverK);
         }
         if (cl.haze > 0) col = mix3(col, bt, cl.haze * 0.55);   // 远层雾化
         col = [col[0] * bright, col[1] * bright, col[2] * bright];
