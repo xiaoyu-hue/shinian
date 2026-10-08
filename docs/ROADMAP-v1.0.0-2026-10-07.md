@@ -74,7 +74,7 @@
 | B2 | ✅ | 三重解锁：主密码 + 生物锁（`@bytetrade/capacitor-native-biometric@6.0.5`，经系统 Keystore 封装 DEK）+ 应用锁（回前台重验）；Web 降级密码-only |
 | B3 | ✅(WebView) / ⚪️(原生) | 发布态 `javascript-obfuscator` 混淆 + `anti-tamper.ts` WebView 层 RASP 已增强落地（六类信号 + 核心完整性 + 可选阻断）；**原生级 Root/Frida/重打包检测经评估主动未引入**（Free-RASP weekly report 上报冲突「零上报」隐私 + 无法本地验证），已如实标注于安全自审 |
 | B4 | ✅ | `_cfg/build-apk.yml` 注入 `allowBackup=false`/`debuggable=false`/禁明文/`network_security_config`（拒用户证书）/`WebView.EnableSafeBrowsing`；CSP 收紧；签名出包保留 |
-| B5 | ✅ | `_docs/SECURITY-AUDIT-v1.0.0.md`（OWASP MASVS v2.1 八类逐条对照 + 残余风险） |
+| B5 | ✅ | `docs/SECURITY-AUDIT-v1.0.0.md`（OWASP MASVS v2.1 八类逐条对照 + 残余风险） |
 
 > **B2 插件选型说明**：路线图中写的是 `@capgo/capacitor-native-biometric`，落地时改用了 **`@bytetrade/capacitor-native-biometric@6.0.5`**——因其 peer 依赖 `@capacitor/core ^6`，与本项目 Capacitor 6 主版本精确对齐（`@capgo` 最新为 v8，需 Capacitor 8）。API 一致（`isAvailable/verifyIdentity/setCredentials/getCredentials`），行为无差异。
 >
