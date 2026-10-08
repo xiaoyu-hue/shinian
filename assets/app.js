@@ -1906,12 +1906,14 @@
       open('unlock');
     });
 
-    // v1.1.1（Q5）：start 改 async——biometric 模块加载即异步自检能力（void detect()），
-    // 若在自检完成前读取 isSupported() 会误判「不支持生物锁」而隐藏生物按钮/漏登记。
-    // 启动时显式 await init() 消除竞态（init 幂等、失败不影响主流程）。
-    async function start() {
+    // v1.1.1（Q5）：biometric 模块加载即异步自检能力（void detect()）——
+    // vaultGate 内显式 await init() 消除竞态（误判「不支持生物锁」而漏登记）。
+    // v1.1.2 修 1：start 更名 vaultGate 并收敛职责——只做「是否弹框」决策，
+    // 不再调用 boot()（boot 已由启动编排层立即执行，此处调 boot 会双重初始化）；
+    // 弹框动作本身由编排层延迟到开场动画收尾后触发。
+    async function vaultGate() {
       var S = SS();
-      if (!S) { booted = true; boot(); return; } // dev/file://：无加密层，直接启动（明文）
+      if (!S) { booted = true; return; } // dev/file://：无加密层，无锁可弹（boot 已由编排层执行）
       var bio = window.ShiNianCore && window.ShiNianCore.biometric;
       if (bio && bio.init) { try { await bio.init(); } catch (e) { /* 检测失败按无生物处理 */ } }
       // 移动端（Capacitor）：始终强制加密存储，忽略网页端开关
@@ -1919,13 +1921,13 @@
         if (S.needsSetup()) open('setup'); else open('unlock');
         return;
       }
-      // 网页端（部署版）：按「启用加密存储」开关决定；默认关 → 直接启动（明文）
-      if (localStorage.getItem('shinian.enc.enabled') !== '1') { booted = true; boot(); return; }
+      // 网页端（部署版）：按「启用加密存储」开关决定；默认关 → 不弹框
+      if (localStorage.getItem('shinian.enc.enabled') !== '1') { booted = true; return; }
       if (S.needsSetup()) open('setup'); else open('unlock');
     }
 
     return {
-      start: start,
+      vaultGate: vaultGate,
       promptPassword: function (mode, cb) { open(mode, cb); },
       requestEnableEnc: function () {
         var S = SS();
@@ -1941,12 +1943,16 @@
     };
   })();
 
+  // v1.1.2 修 1（最终版）：DOMContentLoaded 即播开场动画并立即 boot（业务初始化与
+  // 动画并行，互不阻塞）；锁屏 / 密码框延迟到动画收尾才出现——动画不再被吞，
+  // 业务初始化也不被动画拖慢（首版修复曾把 boot 推迟 2.7s 致许愿池初始化延迟、测试挂 9 条）。
+  function startupSequence() {
+    safe('initSplash', function () { initSplash(function () { safe('vaultGate', VaultCtl.vaultGate); }); });
+    safe('boot', boot);
+  }
   if (document.readyState === 'loading') {
-    // v1.1.2 修 1：先播开场动画，动画收尾后再进入密码框 / 主界面判定（见 initSplash onDone）
-    document.addEventListener('DOMContentLoaded', function () {
-      safe('initSplash', function () { initSplash(function () { VaultCtl.start(); }); });
-    });
+    document.addEventListener('DOMContentLoaded', startupSequence);
   } else {
-    safe('initSplash', function () { initSplash(function () { VaultCtl.start(); }); });
+    startupSequence();
   }
 })();
