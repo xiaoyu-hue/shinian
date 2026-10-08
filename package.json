@@ -1,6 +1,6 @@
 {
   "name": "shinian",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "时念 ShiNian 本地测试与校验环境（网页版自动化测试）",
   "private": true,
   "main": "app.js",
@@ -16,13 +16,13 @@
   "dependencies": {
     "@bytetrade/capacitor-native-biometric": "6.0.5",
     "@capacitor/android": "^6.1.0",
-    "@capacitor/core": "^6.1.0",
-    "jsdom": "^29.1.1"
+    "@capacitor/core": "^6.1.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.1.0",
     "esbuild": "^0.24.0",
     "javascript-obfuscator": "^4.2.2",
+    "jsdom": "^29.1.1",
     "typescript": "^5.6.0"
   }
 }

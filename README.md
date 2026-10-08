@@ -94,7 +94,7 @@
 
 | 依赖 | 用途 | 协议 |
 |---|---|---|
-| [jsdom](https://github.com/jsdom/jsdom) | 自动化测试环境（12 套共 197 项断言在无浏览器环境跑通：念想 / 提醒 / 自动刷新 / 开场 / 云彩 v3 / 日月 / 流星 / 倒数日表单校验 / 加密算法(crypto-vault) / 反篡改 RASP / 加密保险库 / 生物锁） | MIT |
+| [jsdom](https://github.com/jsdom/jsdom) | 自动化测试环境（13 套共 211 项断言在无浏览器环境跑通：念想 / 提醒 / 自动刷新 / 开场 / 云彩 v3 / 日月 / 流星 / 倒数日表单校验 / 加密算法(crypto-vault) / 反篡改 RASP / 加密保险库 / 生物锁 / 加密备份） | MIT |
 | [Node.js](https://nodejs.org) | 仅用于本地跑测试与发布脚本，网页本身不需要 | MIT |
 | [Capacitor CLI / Android](https://capacitorjs.com) | 安卓 APK 构建链（`_cfg/build-apk.yml`，签名密钥走 GitHub Secrets） | MIT |
 | [GitHub Actions](https://github.com/actions)（`actions/checkout`、`setup-node`、`setup-java`） | CI：自动构建与发布 | MIT |
