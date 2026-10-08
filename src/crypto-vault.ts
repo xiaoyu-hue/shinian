@@ -26,6 +26,10 @@ function fromB64(s: string): Uint8Array {
   return out;
 }
 
+/** 导出：原始字节 <-> base64（供 B2 生物锁封装 DEK 复用，避免重复实现）。 */
+export function bytesToB64(buf: Uint8Array): string { return toB64(buf); }
+export function bytesFromB64(s: string): Uint8Array { return fromB64(s); }
+
 /** AES-GCM 密文块（iv + ct 均为 base64）。 */
 export interface EncryptedBlob {
   iv: string;
