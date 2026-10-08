@@ -79,6 +79,7 @@
 | 系统字体栈（`'PingFang SC'`, `'Microsoft YaHei'`, `system-ui`） | 实际使用的字体——**未引入任何 Web 字体**（v0.7.2 修正：此前 README 误列 Noto Sans SC / Inter，二者并未被引用，当前为纯系统字体栈，零字体请求） | — |
 | [lunar-javascript](https://github.com/6tail/lunar-javascript) | 二十四节气 / 农历计算（v0.5 接入，季节切换点以「四立」节气为准） | MIT |
 | [@capacitor/android](https://capacitorjs.com) | 将网页封装为真实安卓 App（已集成，v0.6 真机化） | MIT |
+| [@bytetrade/capacitor-native-biometric](https://github.com/Above-Os/capacitor-native-biometric) | 生物锁原生桥接（v1.0.0 接入，Android Keystore 硬件密钥封装 DEK，系统级指纹 / 面容验证；Web 端自动降级为密码解锁） | MIT |
 | [@capacitor/local-notifications](https://capacitorjs.com) | 本地通知（v0.4 接入，喝水 / 倒数日提醒） | MIT |
 | [@capacitor/splash-screen](https://capacitorjs.com) | 启动画面原生层（v0.6.0 接入，launchAutoHide:false + 深蓝背景，由 Web 开场覆盖层接棒） | MIT |
 | [SunCalc](https://github.com/mourner/suncalc) | 太阳/月亮**高度角与方位角**、月相盈亏、月升月落、黄金时刻（v0.7.0 接入，已 vendored 至 `assets/suncalc.js`，BSD-2 许可头完整保留） | BSD-2-Clause |
@@ -87,11 +88,14 @@
 
 | 依赖 | 用途 | 协议 |
 |---|---|---|
-| [jsdom](https://github.com/jsdom/jsdom) | 自动化测试环境（8 套共 145 项断言在无浏览器环境跑通：念想 / 提醒 / 自动刷新 / 开场 / 云彩 v3 / 日月 / 流星 / 倒数日表单校验） | MIT |
+| [jsdom](https://github.com/jsdom/jsdom) | 自动化测试环境（12 套共 192 项断言在无浏览器环境跑通：念想 / 提醒 / 自动刷新 / 开场 / 云彩 v3 / 日月 / 流星 / 倒数日表单校验 / 加密保险库 / 生物锁） | MIT |
 | [Node.js](https://nodejs.org) | 仅用于本地跑测试与发布脚本，网页本身不需要 | MIT |
 | [Capacitor CLI / Android](https://capacitorjs.com) | 安卓 APK 构建链（`_cfg/build-apk.yml`，签名密钥走 GitHub Secrets） | MIT |
 | [GitHub Actions](https://github.com/actions)（`actions/checkout`、`setup-node`、`setup-java`） | CI：自动构建与发布 | MIT |
 | Gradle / Android SDK | APK 打包（由 CI 提供，不入库） | 各自协议 |
+| [esbuild](https://esbuild.github.io) | 发布态打包（IIFE + `globalName=ShiNianCore` 编译 `src/`，生成 `www/` 加密层与混淆入口） | MIT |
+| [javascript-obfuscator](https://obfuscator.io) | 发布态代码混淆（变量名混淆、字符串加密、控制流扁平化，`renameGlobals:false` 保留全局符号） | BSD-2-Clause |
+| [TypeScript](https://www.typescriptlang.org/) | 新代码（`src/` 加密层与生物锁桥接）的类型检查与编译（不影响零构建的网页本体） | Apache-2.0 |
 
 ### 数据与标准
 
@@ -100,6 +104,8 @@
 | [Open-Meteo](https://open-meteo.com) 天气数据 | 温度、天气码、日出日落 | CC BY 4.0 |
 | WMO 4677 天气代码 | Open-Meteo 返回的天气码语义（晴 / 阴 / 雨 / 雪 / 雾 / 雷）映射 | 国际标准（WMO） |
 | 城市坐标（57 个中国主要城市） | `cities.js` 内联城市列表 | **自整理**（公开地理坐标数据；内联以支持 `file://` 双击打开） |
+| Web Crypto API（浏览器原生） | AES-GCM-256 加解密 + PBKDF2-SHA256 密钥派生（21 万轮，达 OWASP 量级）；不引入任何加密库 | W3C 标准 |
+| OWASP MASVS v2.1 | 移动应用安全验证标准，B 系列安全自审基准（详见 [安全自审报告](./_docs/SECURITY-AUDIT-v1.0.0.md)） | 开放标准（OWASP） |
 
 **Vendored（随仓库分发，非 npm 依赖）**：`assets/lunar.js`（lunar-javascript，MIT）与 `assets/suncalc.js`（SunCalc，BSD-2）均为「零构建、双击即用」目标而随仓库分发，二者均**保留原始许可与归属头**。
 
@@ -159,6 +165,7 @@ v0.7 的云与日月同样为**自研实现**，下列项目**未被引入**（�
 - **[Vladimir Agafonkin / SunCalc](https://github.com/mourner/suncalc) 与 Inigo Quilez**：前者让「日月该在天上哪个位置」变成几行代码，后者让「云该长什么样」有据可依——v0.7 的天穹由此成立
 - **[霞鹜文楷 LXGW WenKai](https://github.com/lxgw/LxgwWenKai) 与 [中文网字计划](https://github.com/Konghayao/cn-font-split)**：姊妹项目主站在用，中文字体网页化的铺路人
 - **每一位为设计系统、无障碍实践与 Web 平台原生能力（CSS 自定义属性、prefers-reduced-motion、backdrop-filter）撰写文档的人**
+- **[OWASP](https://owasp.org) 与 Web Crypto 社区**：加密实现的工程实践来源——PBKDF2 迭代强度、AES-GCM 使用范式、MASVS 自审框架，让「本地加密保险库」有据可依
 
 如果本项目对你有启发，欢迎按各自协议引用——这也正是开源的本意。
 
