@@ -18,7 +18,9 @@ function mockCtx() {
   return {
     globalAlpha: 1, fillStyle: '',
     save() {}, restore() {}, beginPath() {}, clip() {}, arc() {}, fill() {},
-    ellipse() {}, closePath() {}, fillRect() {},
+    // v1.1.3：draw 分支随真实时区/时间变化（CI 为 UTC 会走到画月亮的路径），
+    // 桩必须覆盖 drawSun/drawMoon 用到的全部 ctx 方法，否则时区敏感假失败
+    translate() {}, scale() {}, setTransform() {}, ellipse() {}, closePath() {}, fillRect() {},
     createRadialGradient() { return { addColorStop() {} }; },
     createLinearGradient() { return { addColorStop() {} }; },
   };
