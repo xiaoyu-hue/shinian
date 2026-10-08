@@ -68,56 +68,64 @@ function ss() { return (window.ShiNianCore && window.ShiNianCore.secureStore) ||
 ## 3. 分层架构总览
 
 ```mermaid
-graph TB
-    subgraph P["平台层 Platform"]
-        CAP["Capacitor 6 桥<br/>@capacitor/core · android"]
-        BIO["原生插件<br/>NativeBiometric · LocalNotifications · SplashScreen"]
-    end
-
-    subgraph S["安全核心层 Security Core —— src/*.ts（TS 强类型，esbuild → IIFE）"]
-        CV["crypto-vault.ts<br/>AES-GCM-256 · PBKDF2 210k"]
-        SS["secure-store.ts<br/>统一加密存储 · 内存 cache"]
-        BI["biometric.ts<br/>bioKEK 系统密钥库桥接"]
-        AT["anti-tamper.ts<br/>RASP 6 类检测"]
-        SC["shinian-core.ts<br/>工具函数"]
-        IDX["index.ts<br/>聚合入口 → window.ShiNianCore"]
-    end
-
-    subgraph B["业务层 Business —— assets/app.js（vanilla，1958 行）"]
-        ST["Store 双通道封装"]
-        UI["念想 / 许愿 / 提醒 / 设置 / 备份"]
-        VC["VaultCtl 解锁守卫"]
-        BOOT["boot() 启动编排"]
-    end
-
-    subgraph V["视觉引擎层 Visual —— assets/*.js（自研，canvas + CSS 变量）"]
-        SKY["sky.js 天空引擎<br/>写 :root CSS 变量"]
-        CLD["clouds.js 云引擎 v3<br/>fBm 噪声场"]
-        SM["sunmoon.js 日月<br/>+ suncalc.js"]
-        DCR["decor.js 装饰层<br/>季节彩蛋 / 流星"]
+graph TD
+    subgraph VIS[视觉引擎层 Visual Engine]
+        SKY["sky.js 天空引擎（写 :root CSS 变量）"]
+        CLD["clouds.js 云引擎 v3（fBm 噪声场）"]
+        SUN["sunmoon.js 日月（含 suncalc.js）"]
+        DEC["decor.js 装饰层（季节彩蛋 / 流星）"]
         INT["intro.js 开场动画"]
         SEA["season.js 节气色调"]
-        WTH["weather.js Open-Meteo"]
+        WTH["weather.js Open-Meteo 天气"]
     end
 
-    subgraph D["数据层 Data"]
-        LS["localStorage<br/>明文 / __enc 密文"]
-        KS["Android Keystore<br/>（bioKEK）"]
+    subgraph BIZ[业务层 Business]
+        BOOT["boot 启动编排"]
+        STORE["Store 双通道封装"]
+        VC["VaultCtl 解锁守卫"]
+        UI["念想 / 许愿 / 提醒 / 设置 / 备份"]
     end
 
-    B -->|"Store → ShiNianCore"| S
-    V -->|"CSS 变量 · 事件"| B
-    S -->|"crypto.subtle"| CAP
-    B -->|"Capacitor.isNativePlatform"| CAP
-    S --> BIO
-    S --> LS
-    S --> KS
-    IDX --> CV
-    IDX --> SS
-    IDX --> BI
-    IDX --> AT
-    IDX --> SC
+    subgraph SEC[安全核心层 Security Core]
+        IDX["index.ts 聚合入口 to window.ShiNianCore"]
+        CV["crypto-vault AES-GCM-256 / PBKDF2 210k"]
+        SS["secure-store 统一加密存储"]
+        BI["biometric bioKEK 密钥库桥接"]
+        AT["anti-tamper RASP 6 类检测"]
+    end
+
+    subgraph DATA[数据层 Data]
+        LS[("localStorage 明文 / 密文")]
+        KS[("Android Keystore bioKEK")]
+    end
+
+    subgraph PLAT[平台层 Platform]
+        CAP["Capacitor 6 桥 @capacitor/core"]
+        NAT["Native 插件 Biometric / Notifications / Splash"]
+    end
+
+    VIS -->|CSS 变量 事件| BIZ
+    BIZ -->|Store 调用 ShiNianCore| SEC
+    SEC -->|crypto.subtle 异步加密| DATA
+    SEC -->|原生加密 生物认证| PLAT
+    BIZ -->|Capacitor.isNativePlatform| PLAT
+    SEC --> LS
+    SEC --> KS
 ```
+
+> **图 3-1 时念系统分层架构图**（自上而下为依赖方向：上层依赖下层，下层不反向依赖上层）
+
+各层的标准职责划分如下：
+
+| 层 | 技术形态 | 核心职责 | 关键文件 |
+|---|---|---|---|
+| **视觉引擎层** Visual Engine | 自研 vanilla JS + Canvas + CSS 变量 | 天空 / 云 / 日月 / 装饰 / 开场渲染；以 CSS 变量作为零框架下的轻量状态总线 | `sky.js` `clouds.js` `sunmoon.js` `decor.js` `intro.js` `season.js` `weather.js` |
+| **业务层** Business | 自研 vanilla JS | 启动编排（`boot`）、Store 双通道封装、VaultCtl 解锁守卫、各业务 UI | `assets/app.js` |
+| **安全核心层** Security Core | TypeScript → esbuild → IIFE | 加密保险库、统一加密存储、生物锁桥接、RASP 反逆向 | `src/*.ts`（`crypto-vault` / `secure-store` / `biometric` / `anti-tamper` / `shinian-core` / `index`） |
+| **数据层** Data | 浏览器原生存储 | 明文 `localStorage`、密文 `__enc`、Android Keystore（bioKEK） | `localStorage` / `Android Keystore` |
+| **平台层** Platform | Capacitor 6 | 原生桥、生物认证、系统通知、启动画面 | `@capacitor/core` + 原生插件 |
+
+**分层约束**：依赖方向严格单向（上层 → 下层）。视觉层只通过 CSS 变量与事件与业务层通信；业务层通过 `Store` 与 `ShiNianCore` 调用安全核心层；安全核心层在加密态下落到数据层，在原生态下落到平台层。
 
 **分层规则（ROADMAP A5）**：分层约束**仅作用于新增代码**——新代码与安全关键代码落 `src/` 用 TypeScript，既有 vanilla 文件保持不动。这是"不推翻重来"的渐进式改造策略。
 
@@ -190,12 +198,12 @@ shinian/
 
 ```mermaid
 graph LR
-    A["index.html<br/>（dev 模板）"] -->|"读取 script 顺序"| B["按序拼接 12 个 assets/*.js"]
+    A["index.html<br>（dev 模板）"] -->|"读取 script 顺序"| B["按序拼接 12 个 assets/*.js"]
     B -->|"esbuild transform(minify)"| C["www/assets/bundle.min.js"]
-    D["src/index.ts"] -->|"esbuild build<br/>IIFE · globalName=ShiNianCore"| E["www/assets/shinian-core.min.js"]
+    D["src/index.ts"] -->|"esbuild build<br>IIFE · globalName=ShiNianCore"| E["www/assets/shinian-core.min.js"]
     C -->|"javascript-obfuscator"| F["混淆后 bundle"]
     E -->|"javascript-obfuscator"| G["混淆后 core"]
-    A -->|"正则替换 script 标签<br/>注入版本号 meta"| H["www/index.html"]
+    A -->|"正则替换 script 标签<br>注入版本号 meta"| H["www/index.html"]
     F --> H
     G --> H
     C -.->|"体积参考"| I["603 KB → 433 KB(minify) → 2.07 MB(混淆)"]
@@ -282,11 +290,11 @@ suncalc.js（天文） ┘     ├─ --sky-top / --sky-bottom / --sky-glow
 ```mermaid
 graph TB
     APP["app.js 业务代码"] --> ST["Store.get / Store.set"]
-    ST --> CHK{"window.ShiNianCore<br/>.secureStore.isReady() ?"}
-    CHK -->|"是（加密态）"| ENC["SecureStore 内存 cache<br/>同步读写 → 队列化异步加密落盘"]
+    ST --> CHK{"window.ShiNianCore<br>.secureStore.isReady() ?"}
+    CHK -->|"是（加密态）"| ENC["SecureStore 内存 cache<br>同步读写 → 队列化异步加密落盘"]
     CHK -->|"否（明文态）"| PLAIN["localStorage 直接 JSON"]
-    ENC --> LSE[("localStorage<br/>key + '__enc'")]
-    PLAIN --> LSP[("localStorage<br/>key")]
+    ENC --> LSE[("localStorage<br>key + '__enc'")]
+    PLAIN --> LSP[("localStorage<br>key")]
 ```
 
 设计要点：`crypto.subtle` 是异步的，但既有存储调用是同步的。解法是**解锁后预解密到内存 cache**，让 `get/set` 保持同步语义，`set` 内部再队列化异步落盘。这样既有 1958 行业务代码**一行都不用改**。
@@ -297,12 +305,12 @@ graph TB
 
 ```mermaid
 graph LR
-    PWD["用户主密码"] -->|"PBKDF2-SHA256<br/>210,000 轮"| KEK["KEK 密钥加密密钥"]
-    RND["随机数"] --> DEK["DEK 数据密钥<br/>256-bit，仅内存"]
-    KEK -->|"AES-GCM 封装"| ENV["shinian.vault.v1<br/>（信封：salt+iterations+encDek）"]
+    PWD["用户主密码"] -->|"PBKDF2-SHA256<br>210,000 轮"| KEK["KEK 密钥加密密钥"]
+    RND["随机数"] --> DEK["DEK 数据密钥<br>256-bit，仅内存"]
+    KEK -->|"AES-GCM 封装"| ENV["shinian.vault.v1<br>（信封：salt+iterations+encDek）"]
     DEK --> ENV
     DEK -->|"加密业务数据"| DATA["items / wishes / city / settings"]
-    BIOKEK["bioKEK 生物密钥"] -->|"Android Keystore<br/>生物认证门控"| KS["系统密钥库"]
+    BIOKEK["bioKEK 生物密钥"] -->|"Android Keystore<br>生物认证门控"| KS["系统密钥库"]
     BIOKEK -->|"封装 DEK 副本"| BIOW["shinian.vault.bio.v1"]
     PWD2["主密码（备份用）"] -->|"PBKDF2 独立 salt"| BKEK["备份 KEK"]
     BKEK -->|"加密"| BKUP[".enc.json 备份文件"]
