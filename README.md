@@ -81,6 +81,7 @@
 | [Open-Meteo](https://open-meteo.com) | 免密钥免费天气 API（v0.2 已接入，含日出日落） | CC BY 4.0 |
 | 系统字体栈（`'PingFang SC'`, `'Microsoft YaHei'`, `system-ui`） | 实际使用的字体——**未引入任何 Web 字体**（v0.7.2 修正：此前 README 误列 Noto Sans SC / Inter，二者并未被引用，当前为纯系统字体栈，零字体请求） | — |
 | [lunar-javascript](https://github.com/6tail/lunar-javascript) | 二十四节气 / 农历计算（v0.5 接入，季节切换点以「四立」节气为准） | MIT |
+| [@capacitor/core](https://capacitorjs.com) | Capacitor 本体：Web ↔ 原生桥接层（Web API 优先、原生插件渐进增强的设计范式） | MIT |
 | [@capacitor/android](https://capacitorjs.com) | 将网页封装为真实安卓 App（已集成，v0.6 真机化） | MIT |
 | [@bytetrade/capacitor-native-biometric](https://github.com/Above-Os/capacitor-native-biometric) | 生物锁原生桥接（v1.0.0 接入，Android Keystore 硬件密钥封装 DEK，系统级指纹 / 面容验证；Web 端自动降级为密码解锁） | MIT |
 | [@capacitor/local-notifications](https://capacitorjs.com) | 本地通知（v0.4 接入，喝水 / 倒数日提醒） | MIT |
@@ -93,8 +94,13 @@
 |---|---|---|
 | [jsdom](https://github.com/jsdom/jsdom) | 自动化测试环境（13 套共 211 项断言在无浏览器环境跑通：念想 / 提醒 / 自动刷新 / 开场 / 云彩 v3 / 日月 / 流星 / 倒数日表单校验 / 加密算法(crypto-vault) / 反篡改 RASP / 加密保险库 / 生物锁 / 加密备份） | MIT |
 | [Node.js](https://nodejs.org) | 仅用于本地跑测试与发布脚本，网页本身不需要 | MIT |
-| [Capacitor CLI / Android](https://capacitorjs.com) | 安卓 APK 构建链（`_cfg/build-apk.yml`，签名密钥走 GitHub Secrets） | MIT |
-| [GitHub Actions](https://github.com/actions)（`actions/checkout`、`setup-node`、`setup-java`） | CI：自动构建与发布 | MIT |
+| [Capacitor CLI / Android](https://capacitorjs.com) | 安卓 APK 构建链（`.github/workflows/build-apk.yml`，签名密钥走 GitHub Secrets） | MIT |
+| [GitHub Actions](https://github.com/actions)（`actions/checkout`、`setup-node`、`setup-java`、`upload-artifact`、`github/codeql-action`、`gitleaks/gitleaks-action`） | CI：自动构建、发布与安全扫描 | MIT |
+| [CodeQL](https://codeql.github.com) | GitHub 原生语义代码分析（JS/TS 安全漏洞，v1.1.0 接入，结果进 Security 面板） | GitHub 内置 |
+| [Semgrep](https://semgrep.dev) | 多语言语义 SAST（`p/owasp-top-ten` 规则集，v1.1.0 接入；v1.1.1 起 CI 直跑 CLI） | LGPL-2.1（工具）/ 规则集各自许可 |
+| [Gitleaks](https://github.com/gitleaks/gitleaks) | 密钥 / 令牌泄漏扫描（22 万 star，v1.1.0 接入） | MIT |
+| [MobSF](https://github.com/MobSF/Mobile-Security-Framework-MobSF) | 安卓 APK 动静态混合分析，覆盖 OWASP MASVS（v1.1.0 接入） | GPL-3.0 |
+| [Dependabot + Secret Scanning](https://docs.github.com/en/code-security) | GitHub 原生依赖漏洞更新与推送防护（v1.1.0 接入；v1.1.1 起分组 + 冷却 + 自动合并） | GitHub 内置 |
 | Gradle / Android SDK | APK 打包（由 CI 提供，不入库） | 各自协议 |
 | [esbuild](https://esbuild.github.io) | 发布态打包（IIFE + `globalName=ShiNianCore` 编译 `src/`，生成 `www/` 加密层与混淆入口） | MIT |
 | [javascript-obfuscator](https://obfuscator.io) | 发布态代码混淆（变量名混淆、字符串加密、控制流扁平化，`renameGlobals:false` 保留全局符号） | BSD-2-Clause |
@@ -113,6 +119,26 @@
 **Vendored（随仓库分发，非 npm 依赖）**：`assets/lunar.js`（lunar-javascript，MIT）与 `assets/suncalc.js`（SunCalc，BSD-2）均为「零构建、双击即用」目标而随仓库分发，二者均**保留原始许可与归属头**。
 
 **运行时零框架依赖**——不引入任何前端框架、不引入构建工具。v0.1 时期零网络请求；v0.2 起仅新增一个 Open-Meteo 天气请求（免密钥、不含任何个人信息），且失败时静默降级，不影响时钟与倒数日。
+
+### 参考借鉴（v0.6.5 云彩初版 / v0.7 天穹重构：云彩引擎 v3 + 日月体系）
+
+云彩引擎为**自研实现**（fBm 噪声场 + 密度阈值 + 域翘曲，业界标准做法），以下项目**并未被引入**，但它们的思路给了直接启发，一并致谢：
+
+| 项目 / 来源 | 借鉴点 |
+|---|---|
+| [Inigo Quilez](https://iquilezles.org/articles/warp/) | 域翘曲（domain warping）与 fBm 分形噪声——云彩引擎 v3 的数学内核，根治 v2「柔边圆堆叠」天生聚团的问题 |
+| [mourner/suncalc](https://github.com/mourner/suncalc) | 太阳方位驱动的云体光照（迎光 / 背光、银边效应）算法思路 |
+| Cloud Sky（originkit） | 真实云形态设计参考（积云平底、多层视差） |
+| MiniMax-AI/skills | procedural-noise 程序化噪声工艺 |
+| NousResearch（p5js 社区） | canvas 性能预算表——低分辨率逐像素计算 + 放大贴图的画质 / 性能权衡 |
+| [kevinbadi/claude-motion-skills](https://github.com/kevinbadi/claude-motion-skills) | 动效交付的工程化闭环 |
+| [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API) | Canvas 优化守则（imageSmoothing、离屏 canvas、DPR 处理） |
+| Cloudgen.js | v0.6.5 云彩初版参考（生成式云形） |
+| javascript-animation-skills / canvas-design | canvas 动画组织方式与绘制工艺 |
+| Perlin / Simplex 噪声 | 噪声选型评估基准（v3 最终自研 value-noise fBm，零依赖） |
+| Three.js 体积云 | **评估后排除**——效果达标但引入 3D 引擎违背零依赖目标，v3 用 2D 噪声场达成近似观感 |
+
+> **火烧云的物理依据**：低角度光散射 → 云底橙红 → 中粉 → 顶紫蓝的高度渐变 + 银边效应（silver lining），参数取自真实大气光学现象而非凭空调色。
 
 ### 参考借鉴（v0.5.5 季节彩蛋 / v0.5.6 流星 / v0.5.9 许愿池）
 
