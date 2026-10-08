@@ -19,7 +19,7 @@
 | MASVS-AUTH（认证） | ✅ Met | 主密码 + 生物锁（Keystore）+ 应用锁（回前台重验）三重解锁 |
 | MASVS-NETWORK（网络） | ✅ Met | 仅 HTTPS 天气 API；明文流量禁用、拒用户证书；CSP 收紧 |
 | MASVS-PLATFORM（平台） | 🟡 Partial | 备份/调试/明文已禁；WebView 文件访问依赖 Capacitor 默认，待真机复核 |
-| MASVS-RESILIENCE（抗逆向） | 🟡 Partial | 混淆 + WebView 层反篡改自检已就位；原生级 Root/Hook 检测待接入 |
+| MASVS-RESILIENCE（抗逆向） | 🟡 Partial | 混淆 + WebView 层 RASP 已最大化（注入/hook 痕迹、核心完整性、调试探针、自动化、非原生、DevTools）；原生级 Root/重打包检测经评估未引入（见下） |
 | MASVS-CODE（代码质量） | ✅ Met | 动态文本走 `textContent`、无 `eval`、依赖锁定、测试覆盖 145+ |
 | MASVS-PRIVACY（隐私） | ✅ Met | 用户数据不出端；仅城市名发往天气 API；权限最小（仅生物锁） |
 
@@ -82,9 +82,9 @@
 
 - **实现（已就位）**：
   - **代码混淆**：`tools/build-www.js` 用 `javascript-obfuscator`（控制流扁平化、死代码注入、字符串数组、自保护）混淆发布产物，`renameGlobals:false` 保全局符号（`ShiNianCore` 等）。
-  - **WebView 层反篡改自检**：`anti-tamper.ts` 的 `detectThreats/guard` 检测四类信号——非原生壳（`NOT_NATIVE`）、自动化驱动（`WEBDRIVER`）、DevTools 尺寸差（`DEVTOOLS`）、debugger 注入（`DEBUGGER`），并给风险评分（`test_antitamper.js` 已验证）。
+  - **WebView 层 RASP 自检**：`anti-tamper.ts` 的 `detectThreats/guard` 检测六类信号——非原生壳（`NOT_NATIVE`）、自动化驱动（`WEBDRIVER`）、DevTools 尺寸差（`DEVTOOLS`）、debugger 多重探针（`DEBUGGER`）、注入/hook 框架痕迹（`INJECTION`：Frida/Xposed/Il2Cpp 等全局标记）、核心层 `ShiNianCore` 形态完整性（`CORE_TAMPERED`：检测被替换/注入），并给风险评分（`blockOnHighRisk` 可开启强制拦截，`test_antitamper.js` 13 项已验证）。
 - **残余风险（明确差距）**：
-  - **原生级 Root / 模拟器 / 重打包 / Frida·Xposed Hook 检测未实现**——属 B3 声明的边界（需 Free-RASP 原生插件）。**建议后续接入 `@talsec/free-rasp`** 补齐 MASVS-RESILIENCE 的 L2 要求。
+  - **原生级 Root / 模拟器 / 重打包 / 签名校验检测未引入**——评估后**主动未引入**原生 RASP SDK（真实包名 `capacitor-freerasp`）。理由：① 本项目为零后端、零账户、单机模型，RASP 边际收益低；② Free-RASP 的 weekly report 存在威胁/设备数据上报，与本项目「零采集、零上报」隐私承诺冲突；③ `android/` 不入库、构建环境不编原生，引入后无法本地验证真机行为。WebView 层能力范围内的 RASP 已最大化覆盖本项目实际威胁模型（代码被搬出 App、自动化驱动、调试、注入框架、核心被篡改）。
   - 混淆仅提高门槛，不能阻止有决心的逆向；属行业共性，非缺陷。
 
 ### 2.7 MASVS-CODE · ✅ Met
@@ -109,7 +109,7 @@
 
 | 风险 | 严重度 | 现状 | 建议 |
 |---|---|---|---|
-| 原生级 Root/Hook/重打包检测缺失 | 中 | B3 仅 WebView 层 | 接入 `@talsec/free-rasp`（Capacitor 原生） |
+| 原生级 Root/Hook/重打包检测缺失 | 低 | 评估后主动未引入（隐私 / 单机模型 / 无法本地验证） | 接受；WebView 层 RASP 已覆盖实际威胁，且数据保密由 B1/B2 锁死，不依赖 RASP |
 | 证书锁定未做 | 低-中 | 系统 CA + 拒用户 CA | 后续原生网络安全配置补 pinning |
 | WebView 文件访问未显式断言 | 低 | 依赖 Capacitor 默认 | 真机出包后校验 `getSettings()` |
 | 混淆可逆向 | 低 | 行业共性 | 接受；结合原生 RASP 提升门槛 |

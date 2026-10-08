@@ -31,7 +31,7 @@
 |---|---|---|---|
 | **B1** | 密码防线：`secure-store.js` 内用 **Web Crypto**（AES-GCM + PBKDF2，主密码派生密钥）加密 countdowns/wishes/settings/city；明文→密文；unlock/lock/changePassword。**零依赖**，不引 `crypto-js`（CBC/维护停滞/已知 bug） | `sapthesh/offline-vault`（PBKDF2 10 万轮+AES-GCM）、`TolinSimpson/PWA-Template` | 防数据泄露、防暴力破解（**唯一能挡"手机丢了"**） |
 | **B2** | 三重解锁（密码+设备密钥+生物锁）：AndroidKeyStore 硬件绑定密钥封装 DEK + `@capgo/capacitor-native-biometric` 生物锁；解锁可任一路（密码 or 生物）；**切后台回前台需重新验证**（应用锁）。Web 降级为密码-only | `capacitor-native-biometric` + AndroidKeyStore | 你定的"三重防线" |
-| **B3** | 反逆向：`talsec/Free-RASP-Capacitor`（免费 RASP：root/Frida/重打包/调试/完整性检测，触发锁定或告警）+ 发布态 `javascript-obfuscator` 混淆 `www` JS（仅打包态，不破坏零构建开发态） | `talsec/Free-RASP-Capacitor`、`javascript-obfuscator` | 反防逆向、防篡改 |
+| **B3** | 反逆向：`anti-tamper.ts` WebView 层 RASP（注入/hook 痕迹 + 核心完整性 + 调试探针 + 自动化/非原生/DevTools 检测，风险评分与可选阻断）+ 发布态 `javascript-obfuscator` 混淆 `www` JS（仅打包态）。**原生级 Root/Frida/重打包检测经评估未引入**（Free-RASP 的 weekly report 上报与「零上报」隐私冲突，且 android/ 不入库无法本地验证） | `javascript-obfuscator` | 反防逆向、防篡改 |
 | **B4** | WebView 硬化 + 签名出包：`debuggable=false`、关 `webContentsDebugging`、禁 `file` access、CSP 收紧；Release 签名密钥**仅走 GitHub Secrets（KEYSTORE_BASE64 等），绝不落盘/硬编码**（你已授权 AI 生成仅存 Secret）；APK 自动挂 GitHub Release | Capacitor 原生配置 + GitHub Actions Secrets | 专业安全构建 |
 | **B5** | 安全自审：按 OWASP MASVS v2.1 八类（存储/密码学/认证/网络/平台/反逆向/代码质量）逐条对照，列已覆盖/部分/未覆盖与剩余风险 | OWASP MASVS | 验证加固是否真生效 |
 
@@ -39,7 +39,7 @@
 
 - **打包/构建**：`esbuild`（单依赖、无配置、比 Vite 轻一个量级，**仅发布态**）。
 - **加密范本**：`sapthesh/offline-vault`、`TolinSimpson/PWA-Template`（均零依赖 Web Crypto）；**明确不引 `crypto-js`**。
-- **反逆向**：`talsec/Free-RASP-Capacitor`；`javascript-obfuscator`。
+- **反逆向**：`javascript-obfuscator`（混淆）+ `anti-tamper.ts` WebView 层 RASP（原生级 RASP 经评估未引入，理由见安全自审报告）。
 - **原生构建/发布 Skill**：`capawesome-team/skills`（37 个、MIT，含 `capacitor-app-creation`/`capacitor-plugins`/`capawesome-cloud` 原生构建+发布）；`vanilla-js-architect`（零框架 + JSDoc + DDD 规范）。均遵循开放 Agent Skills 规范，适配 AI 全程协作模式。
 - **签名**：GitHub Release 自签名（KEYSTORE 走 Secret）；若日后上 Google Play 再接 App Signing 双密钥。
 - **构建位置**：本地**无 Android SDK**，APK 编译全在 **GitHub Actions**（`workflow_dispatch`，手机用 GitHub App 触发 → 下载 APK）。
@@ -72,7 +72,7 @@
 | A5 | ✅ | 分层仅约束新增代码（`src/`），旧核心视觉算法原样保留 |
 | B1 | ✅ | 主密码加密保险库：`crypto-vault.ts`（AES-GCM-256 + PBKDF2 21 万轮）、`secure-store.ts`（DEK 不落盘、lock/unlock/changePassword） |
 | B2 | ✅ | 三重解锁：主密码 + 生物锁（`@bytetrade/capacitor-native-biometric@6.0.5`，经系统 Keystore 封装 DEK）+ 应用锁（回前台重验）；Web 降级密码-only |
-| B3 | 🟡 | 发布态 `javascript-obfuscator` 混淆 + `anti-tamper.ts` WebView 层自检（非原生/WebDriver/DevTools/debugger）已落地；**原生级 Root/Frida/重打包检测（Free-RASP）待后续接入** |
+| B3 | ✅(WebView) / ⚪️(原生) | 发布态 `javascript-obfuscator` 混淆 + `anti-tamper.ts` WebView 层 RASP 已增强落地（六类信号 + 核心完整性 + 可选阻断）；**原生级 Root/Frida/重打包检测经评估主动未引入**（Free-RASP weekly report 上报冲突「零上报」隐私 + 无法本地验证），已如实标注于安全自审 |
 | B4 | ✅ | `_cfg/build-apk.yml` 注入 `allowBackup=false`/`debuggable=false`/禁明文/`network_security_config`（拒用户证书）/`WebView.EnableSafeBrowsing`；CSP 收紧；签名出包保留 |
 | B5 | ✅ | `_docs/SECURITY-AUDIT-v1.0.0.md`（OWASP MASVS v2.1 八类逐条对照 + 残余风险） |
 
