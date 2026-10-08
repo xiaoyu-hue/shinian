@@ -1,0 +1,24 @@
+name: Dependabot 自动合并
+
+# 机器人开出的依赖升级 PR：CI 检查通过后自动 squash 合并，分支自动删除。
+# 仅对 dependabot[bot] 开的 PR 生效，人工 PR 一律走正常评审。
+# 前置条件：仓库设置 allow_auto_merge（2026-10-08 已开启）。
+# 若升级引入问题：push 到 main 的 CI（CodeQL/Gitleaks/Semgrep/测试）会报警，
+#   可在 PR 页面 @dependabot revert 一键回滚。
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependabot:
+    name: Dependabot PR 自动合并
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'xiaoyu-hue/shinian' }}
+    steps:
+      - name: 开启自动合并（squash，保持线性历史）
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

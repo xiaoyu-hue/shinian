@@ -9,6 +9,14 @@ updates:
     labels:
       - "dependencies"
       - "security"
+    # 冷却 7 天：过滤刚发布的新版本（易出坏版本），顺带满足 Semgrep 加固建议
+    cooldown:
+      default-days: 7
+    # 同生态的多个依赖更新合并进同一个 PR，最多每周一个分支
+    groups:
+      npm-all:
+        patterns:
+          - "*"
   # GitHub Actions 自身版本更新（防止 CI action 漂移）
   - package-ecosystem: "github-actions"
     directory: "/.github/workflows"
@@ -17,3 +25,10 @@ updates:
     labels:
       - "github-actions"
       - "security"
+    cooldown:
+      default-days: 7
+    # 上次 5 个 action 同时更新开出 5 个分支的根源即未分组；分组后每周最多 1 个 PR
+    groups:
+      actions-all:
+        patterns:
+          - "*"
