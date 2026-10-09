@@ -15,45 +15,16 @@ import * as biometric from './biometric';
 
 const ShiNianCore = {
   ...core.ShiNianCore,
-  crypto: {
-    generateDek: crypto.generateDek,
-    deriveKek: crypto.deriveKek,
-    wrapDek: crypto.wrapDek,
-    unwrapDek: crypto.unwrapDek,
-    aesEncrypt: crypto.aesEncrypt,
-    aesDecrypt: crypto.aesDecrypt,
-    createVault: crypto.createVault,
-    unlockVault: crypto.unlockVault,
-    PBKDF2_ITERATIONS: crypto.PBKDF2_ITERATIONS,
-  },
-  antiTamper: {
-    detectThreats: antiTamper.detectThreats,
-    guard: antiTamper.guard,
-  },
+  // 直接引用各模块完整命名空间（而非手工挑函数），从源头消除"漏导出导致功能静默失效"的隐患。
+  // 以 crypto 为例：现网 app.js 的判据是 window.ShiNianCore.crypto.encryptWithPassword 是否存在，
+  // 此前手工聚合仅挑 9 个函数、不含 encryptWithPassword/decryptWithPassword 等；一旦打包方式变化
+  // 就可能退化为 9 函数版、使加密备份静默消失。改为引用完整命名空间后永不失同步。
+  crypto,
+  antiTamper,
   // A3 + B1：统一加密存储层（dev/file:// 下 window.ShiNianCore 不存在，app.js 自动降级明文）
-  secureStore: {
-    isAvailable: secureStore.isAvailable,
-    needsSetup: secureStore.needsSetup,
-    isReady: secureStore.isReady,
-    setup: secureStore.setup,
-    unlock: secureStore.unlock,
-    unlockWithBiometric: secureStore.unlockWithBiometric,
-    lock: secureStore.lock,
-    get: secureStore.get,
-    set: secureStore.set,
-    changePassword: secureStore.changePassword,
-    KNOWN_KEYS: secureStore.KNOWN_KEYS,
-    dataKeys: secureStore.dataKeys, // v1.1.1（Q3）：全键集（自愈式键发现），迁移/改密遍历用
-  },
+  secureStore,
   // B2：生物锁原生桥接（Web 下 supported=false，自动降级主密码）
-  biometric: {
-    init: biometric.init,
-    isSupported: biometric.isSupported,
-    isEnrolled: biometric.isEnrolled,
-    storeSecret: biometric.storeSecret,
-    getSecret: biometric.getSecret,
-    deleteSecret: biometric.deleteSecret,
-  },
+  biometric,
 };
 
 if (typeof window !== 'undefined') {
