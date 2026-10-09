@@ -117,5 +117,18 @@ setEnv({ native: false, webdriver: true });
 let r12 = A.detectThreats();
 ok('dev 模式无 core 不误判 CORE_TAMPERED', r12.coreTampered === false);
 
+// 场景13：skipNotNative 时非原生不计入 NOT_NATIVE（网页部署版场景）
+setEnv({ native: false, webdriver: true });
+let r13 = A.detectThreats({ skipNotNative: true });
+ok('skipNotNative 跳过 NOT_NATIVE 且仅 webdriver 计 30 分',
+   r13.threats.includes('NOT_NATIVE') === false && r13.score === 30 && r13.webDriver === true);
+
+// 场景14：guard({skipNotNative:true}) 透传，非原生不报 NOT_NATIVE 且不阻断
+setEnv({ native: false, webdriver: true });
+let g14, threw14 = false;
+try { g14 = A.guard({ skipNotNative: true }); } catch (e) { threw14 = true; }
+ok('guard 透传 skipNotNative 不报 NOT_NATIVE 且不阻断',
+   threw14 === false && g14.threats.includes('NOT_NATIVE') === false);
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 process.exit(fail ? 1 : 0);

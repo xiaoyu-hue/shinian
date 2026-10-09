@@ -1946,7 +1946,17 @@
   // v1.1.2 修 1（最终版）：DOMContentLoaded 即播开场动画并立即 boot（业务初始化与
   // 动画并行，互不阻塞）；锁屏 / 密码框延迟到动画收尾才出现——动画不再被吞，
   // 业务初始化也不被动画拖慢（首版修复曾把 boot 推迟 2.7s 致许愿池初始化延迟、测试挂 9 条）。
+  // B3 · 运行时反篡改自检（接通 anti-tamper.ts 的 RASP，原仅在单测/校验脚本跑过）：
+  // dev/file:// 态无 ShiNianCore → 判空跳过；APK 态（原生壳）全套检测；
+  // 网页部署版非原生但合法 → skipNotNative 跳过 NOT_NATIVE 噪音，其余检测保留。
   function startupSequence() {
+    safe('antiTamper', function () {
+      var at = window.ShiNianCore && window.ShiNianCore.antiTamper;
+      if (!at) return;
+      var nativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform
+                         && window.Capacitor.isNativePlatform());
+      at.guard(nativeApp ? {} : { skipNotNative: true });
+    });
     safe('initSplash', function () { initSplash(function () { safe('vaultGate', VaultCtl.vaultGate); }); });
     safe('boot', boot);
   }

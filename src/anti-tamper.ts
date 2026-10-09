@@ -123,7 +123,7 @@ function detectCoreIntegrity(): boolean {
 }
 
 /** 执行一次完整自检。 */
-export function detectThreats(): ThreatReport {
+export function detectThreats(opts: { skipNotNative?: boolean } = {}): ThreatReport {
   const native = hasCapacitorNative();
   const webDriver = detectWebDriver();
   const devtools = detectDevtools();
@@ -132,7 +132,7 @@ export function detectThreats(): ThreatReport {
   const coreTampered = detectCoreIntegrity();
 
   const threats: string[] = [];
-  if (!native) threats.push('NOT_NATIVE');
+  if (!native && !opts.skipNotNative) threats.push('NOT_NATIVE');
   if (webDriver) threats.push('WEBDRIVER');
   if (devtools) threats.push('DEVTOOLS');
   if (debuggerAttached) threats.push('DEBUGGER');
@@ -143,7 +143,7 @@ export function detectThreats(): ThreatReport {
   if (webDriver) score += 30;
   if (devtools) score += 20;
   if (debuggerAttached) score += 20;
-  if (!native) score += 30;       // 代码被搬出 App 运行 = 最高危信号之一
+  if (!native && !opts.skipNotNative) score += 30;       // 代码被搬出 App 运行 = 最高危信号之一
   if (injection) score += 35;     // 注入 / hook 框架附着 = 高危
   if (coreTampered) score += 50;  // 核心层被替换 / 注入 = 最高危
 
@@ -157,11 +157,17 @@ export interface GuardOptions {
   highScoreThreshold?: number;
   /** 命中高危（score 达阈值，或注入 / 核心篡改）时是否强制阻断（默认 false，仅告警）。 */
   blockOnHighRisk?: boolean;
+  /**
+   * 跳过 NOT_NATIVE 检测项（默认 false）。
+   * 网页部署版运行在浏览器而非 Capacitor 原生壳内，NOT_NATIVE 属合法常态而非威胁，
+   * 跳过它可避免主站控制台持续告警；注入 / 核心篡改等其余检测仍生效。
+   */
+  skipNotNative?: boolean;
 }
 
 /** 自检 + 统一告警；返回报告，默认不阻断流程（blockOnNonNative / blockOnHighRisk 可开启强制拦截）。 */
 export function guard(opts: GuardOptions = {}): ThreatReport {
-  const report = detectThreats();
+  const report = detectThreats({ skipNotNative: opts.skipNotNative });
   const threshold = opts.highScoreThreshold ?? 50;
   const high = report.score >= threshold;
 
