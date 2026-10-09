@@ -2,7 +2,7 @@
 
 > **文档性质**：架构现状快照（Architecture Snapshot），对齐代码版本 **v1.1.3**
 > **快照基准**：`package.json` version = `1.1.3` · 文档初稿 HEAD = `7b67024` · 生成日期 2026-10-08
-> **最近同步**：2026-10-09 同步 **P1（B3 RASP 运行时接通，提交 `2242f5d`）** 状态——见第 0 / 7.1 / 7.4 / 10.1 / 11 章
+> **最近同步**：2026-10-09 同步 **P1（B3 RASP 运行时接通 `2242f5d`）→ P2（收敛 index.ts 双导出 `53ecfe2`）→ P3（混淆产物校验接入 CI `ac6848b`）** 状态——见第 0 / 7.1 / 7.4 / 10.1 / 10.4 / 11 章
 > **读者指引**：决策者读第 0、1、2、10 章；开发 / AI 协作方读第 3–9、11 章与附录
 > **许可**：本文属 `docs/` 目录，采用 [CC BY-NC-SA 4.0](./LICENSE-DOCS)（禁止商用、需署名、相同方式共享）
 
@@ -15,9 +15,9 @@
 | 1 | 项目已形成稳定的「**零构建 dev 态 + esbuild 发布态**」双形态混合架构，这是它最核心的架构特征，也是全部设计约束的源头 | 基线 |
 | 2 | 安全架构（加密保险库 / 生物锁 / 应用锁 / 反篡改 / 混淆）**代码质量扎实**，双层密钥与 21 万轮 PBKDF2 均达 OWASP 量级 | 基线 |
 | 3 | 反篡改模块（B3）RASP 六类检测已在 **P1 接通运行时调用**（此前"装了没开"，只在单测跑过）；默认仅告警不阻断 | ✅ 已修复 |
-| 4 | `src/index.ts` 存在**两套并存的导出路径**（手工聚合对象 + `export * as ns`），当前现网侥幸走对了那条，但这是脆弱设计 | **P2** |
-| 5 | `typecheck` 质量门**只覆盖 `src/` 的 6 个 TS 文件**，`assets/` 下约 5 000 行 vanilla 主力代码不在门内 | **P2** |
-| 6 | 三个校验脚本（`_verify_obf.js` / `chaincheck.js` / `bundlecheck.js`）游离在仓库根目录，未接入 `npm test` | P3 |
+| 4 | `src/index.ts` 原先存在**两套并存的导出路径**（手工聚合对象 + `export * as ns`），已在 **P2 收敛为直接引用完整命名空间**，消除漏函数隐患 | ✅ 已修复（P2） |
+| 5 | `typecheck` 质量门**只覆盖 `src/` 的 6 个 TS 文件**，`assets/` 下约 5 000 行 vanilla 主力代码不在门内 | **P2**（10.3，仍未修） |
+| 6 | 三个校验脚本（`_verify_obf.js` / `chaincheck.js` / `bundlecheck.js`）游离在仓库根目录，未接入 `npm test`；其中 **`_verify_obf.js` 已在 P3 接入 CI**，`chaincheck.js` / `bundlecheck.js` 仍游离 | 部分修复（P3） |
 | 7 | `android/` 与 `www/` 均不入库，**APK 无法在本地复现**，完全依赖 GitHub Actions | 已知取舍 |
 
 一句话：**架构骨架是对的，安全层的"接线"有几处没接牢**。第 10 章给出逐项清单。
@@ -478,11 +478,16 @@ export * as secureStore from './secure-store';
 
 **建议**：分批改，从 `weather.js`（94 行）这类小文件开始加 `// @ts-check`；或明确接受现状并在文档中写明"类型门只守护新代码"，避免误判安全感。
 
-### 10.4 【P3】根目录三个游离校验脚本
+### 10.4 【P3 · ✅ 已修复】混淆产物校验接入 CI
 
-`_verify_obf.js`、`chaincheck.js`、`bundlecheck.js` 位于仓库根目录，既未接入 `npm test`，也未归入 `tools/`。其中 `_verify_obf.js` 验证"混淆后全局接口齐全"，价值很高，应当进 CI。
+**原现象**：`_verify_obf.js`、`chaincheck.js`、`bundlecheck.js` 位于仓库根目录，既未接入 `npm test`，也未归入 `tools/`。其中 `_verify_obf.js` 验证"混淆后全局接口齐全"，价值很高却未进 CI，混淆产物回归无自动拦截。
 
-**建议**：移入 `tools/` 并把 `_verify_obf.js` 挂到 `build:release` 之后（它依赖 `www/` 产物）。
+**修复（提交 `ac6848b`）**：
+- `package.json` 新增 `verify:release` 脚本（`node _verify_obf.js`），本地可 `npm run build:release && npm run verify:release` 一键校验
+- `.github/workflows/build-apk.yml` 在"发布态构建"后新增"混淆产物接口校验（B3 质量门）"步骤，CI 每次出包自动校验混淆产物接口齐全（依赖上一步 `www/` 产出；`jsdom` 已在 devDependencies）
+- 顺带修复 `_verify_obf.js`"无致命加载错误"项的唯一误报：`app.js` 的 VaultCtl IIFE 尾部对 `submitEl` / `pwdEl` / `pwd2El` 事件绑定补 `null` 守卫（真实 `index.html` 中元素均存在，零行为变化；仅防止 jsdom 回放等非标准加载环境加载即抛 `null.addEventListener`）。修复后校验 **9/9 通过**（原 8/9）
+
+**遗留**：`chaincheck.js` / `bundlecheck.js` 仍游离未接入，价值较低，留待后续；本次按"最小面"原则只接最高价值的 `_verify_obf.js`，未扩大改动。
 
 ### 10.5 【P3】开启加密的迁移仍用 `KNOWN_KEYS`，未用 `dataKeys()` 并集
 
@@ -507,8 +512,8 @@ export * as secureStore from './secure-store';
 | 优先级 | 动作 | 收益 | 成本 |
 |---|---|---|---|
 | 1 | ~~接通 `antiTamper.guard()`（10.1）~~ **✅ 已在 P1 完成** | 让已写好的安全能力真正生效 | 低（数行代码 + 形态判断） |
-| 2 | 收敛 `src/index.ts` 双导出路径（10.2） | 消除静默失效隐患 | 低（删掉聚合对象 + 补断言测试） |
-| 3 | `_verify_obf.js` 接入 CI（10.4） | 发布态产物每次自动验证 | 低 |
+| 2 | ~~收敛 `src/index.ts` 双导出路径（10.2）~~ **✅ 已在 P2 完成** | 消除静默失效隐患 | 低（引用完整命名空间 + 补断言测试） |
+| 3 | ~~`_verify_obf.js` 接入 CI（10.4）~~ **✅ 已在 P3 完成** | 发布态产物每次自动验证 | 低（CI 步骤 + 空值守卫） |
 | 4 | 给 `weather.js` 等小文件加 `@ts-check`（10.3） | 类型门开始覆盖存量代码 | 中（需逐个消错） |
 | 5 | 清理 `KNOWN_KEYS` / `dataKeys()` 不一致（10.5） | 消除未来新增键的漏迁风险 | 低 |
 | 6 | CSP 去 `unsafe-inline`（改 nonce/hash） | 收紧 XSS 面 | 中 |
@@ -542,7 +547,7 @@ export * as secureStore from './secure-store';
 npm test              # 13 套 211 项测试（串行链）
 npm run typecheck     # TS 类型检查（仅 src/ + types/）
 npm run build:release # 生成 www/（esbuild + 混淆）
-node _verify_obf.js   # 校验混淆产物全局接口齐全（需先 build:release）
+npm run verify:release # 校验混淆产物全局接口齐全（需先 build:release；CI 已自动跑）
 ```
 
 ---
