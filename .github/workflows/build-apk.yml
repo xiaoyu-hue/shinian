@@ -46,6 +46,11 @@ jobs:
       - name: 发布态构建 (www/)
         run: npm run build:release
 
+      # P3：B3 混淆产物质量门——确认混淆不破坏运行（全局接口齐全、无致命加载错误、核心 API 可调用）。
+      # 依赖上一步 build:release 产出的 www/；jsdom 已在 devDependencies，npm ci 已安装。
+      - name: 混淆产物接口校验（B3 质量门）
+        run: npm run verify:release
+
       - name: 注入 Capacitor Android 平台（首次生成 android/）
         run: test -d android || npx cap add android
 

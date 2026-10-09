@@ -1884,9 +1884,11 @@
         .catch(function (e) { submitEl.disabled = false; bioEl.disabled = false; fail('生物锁解锁失败：' + (e && e.message || e)); });
     }
 
-    submitEl.addEventListener('click', submit);
-    pwdEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
-    pwd2El.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    // 守卫：元素缺失时跳过绑定（真实 index.html 中均存在，零行为变化；
+    // 仅防止在 jsdom 回放等非标准加载环境下加载即抛 null.addEventListener）
+    if (submitEl) submitEl.addEventListener('click', submit);
+    if (pwdEl) pwdEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    if (pwd2El) pwd2El.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     if (bioEl) bioEl.addEventListener('click', onBio);
 
     // 应用锁：回前台重新验证（B2 应用锁的密码侧）。已锁（modal 在）则不重复触发。
