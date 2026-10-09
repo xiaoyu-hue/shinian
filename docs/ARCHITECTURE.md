@@ -68,51 +68,7 @@ function ss() { return (window.ShiNianCore && window.ShiNianCore.secureStore) ||
 
 ## 3. 分层架构总览
 
-```mermaid
-graph TD
-    subgraph VIS[视觉引擎层 Visual Engine]
-        SKY["sky.js 天空引擎（写 :root CSS 变量）"]
-        CLD["clouds.js 云引擎 v3（fBm 噪声场）"]
-        SUN["sunmoon.js 日月（含 suncalc.js）"]
-        DEC["decor.js 装饰层（季节彩蛋 / 流星）"]
-        INT["intro.js 开场动画"]
-        SEA["season.js 节气色调"]
-        WTH["weather.js Open-Meteo 天气"]
-    end
-
-    subgraph BIZ[业务层 Business]
-        BOOT["boot 启动编排"]
-        STORE["Store 双通道封装"]
-        VC["VaultCtl 解锁守卫"]
-        UI["念想 / 许愿 / 提醒 / 设置 / 备份"]
-    end
-
-    subgraph SEC[安全核心层 Security Core]
-        IDX["index.ts 聚合入口 to window.ShiNianCore"]
-        CV["crypto-vault AES-GCM-256 / PBKDF2 210k"]
-        SS["secure-store 统一加密存储"]
-        BI["biometric bioKEK 密钥库桥接"]
-        AT["anti-tamper RASP 6 类检测"]
-    end
-
-    subgraph DATA[数据层 Data]
-        LS[("localStorage 明文 / 密文")]
-        KS[("Android Keystore bioKEK")]
-    end
-
-    subgraph PLAT[平台层 Platform]
-        CAP["Capacitor 6 桥 @capacitor/core"]
-        NAT["Native 插件 Biometric / Notifications / Splash"]
-    end
-
-    VIS -->|CSS 变量 事件| BIZ
-    BIZ -->|Store 调用 ShiNianCore| SEC
-    SEC -->|crypto.subtle 异步加密| DATA
-    SEC -->|原生加密 生物认证| PLAT
-    BIZ -->|Capacitor.isNativePlatform| PLAT
-    SEC --> LS
-    SEC --> KS
-```
+![图 3-1 时念系统分层架构](./diagrams/architecture-layers.svg)
 
 > **图 3-1 时念系统分层架构图**（自上而下为依赖方向：上层依赖下层，下层不反向依赖上层）
 
@@ -197,19 +153,7 @@ shinian/
 
 ### 5.2 发布态：`npm run build:release`
 
-```mermaid
-graph LR
-    A["index.html<br>（dev 模板）"] -->|"读取 script 顺序"| B["按序拼接 12 个 assets/*.js"]
-    B -->|"esbuild transform(minify)"| C["www/assets/bundle.min.js"]
-    D["src/index.ts"] -->|"esbuild build<br>IIFE · globalName=ShiNianCore"| E["www/assets/shinian-core.min.js"]
-    C -->|"javascript-obfuscator"| F["混淆后 bundle"]
-    E -->|"javascript-obfuscator"| G["混淆后 core"]
-    A -->|"正则替换 script 标签<br>注入版本号 meta"| H["www/index.html"]
-    F --> H
-    G --> H
-    C -.->|"体积参考"| I["603 KB → 433 KB(minify) → 2.07 MB(混淆)"]
-    E -.->|"体积参考"| J["11.4 KB → 56.9 KB(混淆)"]
-```
+![图 5-2 发布态构建管线](./diagrams/build-pipeline.svg)
 
 关键设计（写死在 `tools/build-www.js`）：
 
@@ -239,34 +183,7 @@ graph LR
 
 ### 6.1 启动时序
 
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant H as index.html
-    participant S as ShiNianCore(core)
-    participant A as app.js
-    participant V as VaultCtl
-
-    U->>H: 打开页面
-    H->>S: shinian-core.min.js（defer）
-    H->>A: bundle.min.js（defer）
-    A->>A: DOMContentLoaded → startupSequence()
-    par 并行
-        A->>A: initSplash() 播开场动画（约 2.7s）
-        A->>A: boot() 业务初始化
-    end
-    A-->>V: 动画收尾 → vaultGate()
-    alt window.ShiNianCore 不存在（file://）
-        V->>V: booted = true，直接进主界面
-    else 移动端（window.Capacitor）
-        V->>U: 强制弹 setup / unlock
-    else 网页部署版
-        V->>V: 读 shinian.enc.enabled
-        V->>U: = '1' 才弹框，否则直接进
-    end
-    U->>V: 输入主密码 / 生物验证
-    V->>A: onSuccess() → boot()（若未 boot 过）
-```
+![图 6-1 启动时序](./diagrams/startup-sequence.svg)
 
 > v1.1.2 修过一次时序 bug：早期版本把 `boot()` 推迟到解锁之后，导致 APK 冷启动只见密码框、开场动画从未播放。现在是**动画与业务并行**，锁屏延迟到动画收尾。
 
@@ -288,15 +205,7 @@ suncalc.js（天文） ┘     ├─ --sky-top / --sky-bottom / --sky-glow
 
 ### 6.3 数据存储：双通道
 
-```mermaid
-graph TB
-    APP["app.js 业务代码"] --> ST["Store.get / Store.set"]
-    ST --> CHK{"window.ShiNianCore<br>.secureStore.isReady() ?"}
-    CHK -->|"是（加密态）"| ENC["SecureStore 内存 cache<br>同步读写 → 队列化异步加密落盘"]
-    CHK -->|"否（明文态）"| PLAIN["localStorage 直接 JSON"]
-    ENC --> LSE[("localStorage<br>key + '__enc'")]
-    PLAIN --> LSP[("localStorage<br>key")]
-```
+![图 6-3 数据存储双通道](./diagrams/data-storage.svg)
 
 设计要点：`crypto.subtle` 是异步的，但既有存储调用是同步的。解法是**解锁后预解密到内存 cache**，让 `get/set` 保持同步语义，`set` 内部再队列化异步落盘。这样既有 1958 行业务代码**一行都不用改**。
 
@@ -304,18 +213,7 @@ graph TB
 
 ### 6.4 加密密钥体系
 
-```mermaid
-graph LR
-    PWD["用户主密码"] -->|"PBKDF2-SHA256<br>210,000 轮"| KEK["KEK 密钥加密密钥"]
-    RND["随机数"] --> DEK["DEK 数据密钥<br>256-bit，仅内存"]
-    KEK -->|"AES-GCM 封装"| ENV["shinian.vault.v1<br>（信封：salt+iterations+encDek）"]
-    DEK --> ENV
-    DEK -->|"加密业务数据"| DATA["items / wishes / city / settings"]
-    BIOKEK["bioKEK 生物密钥"] -->|"Android Keystore<br>生物认证门控"| KS["系统密钥库"]
-    BIOKEK -->|"封装 DEK 副本"| BIOW["shinian.vault.bio.v1"]
-    PWD2["主密码（备份用）"] -->|"PBKDF2 独立 salt"| BKEK["备份 KEK"]
-    BKEK -->|"加密"| BKUP[".enc.json 备份文件"]
-```
+![图 6-4 加密密钥体系](./diagrams/crypto-keys.svg)
 
 **三条铁律**：
 1. **主密码永不落盘**，DEK 永不落盘
