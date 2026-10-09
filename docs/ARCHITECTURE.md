@@ -1,7 +1,8 @@
 # 时念 ShiNian · 架构文档
 
 > **文档性质**：架构现状快照（Architecture Snapshot），对齐代码版本 **v1.1.3**
-> **快照基准**：`package.json` version = `1.1.3` · main HEAD = `7b67024` · 生成日期 2026-10-08
+> **快照基准**：`package.json` version = `1.1.3` · 文档初稿 HEAD = `7b67024` · 生成日期 2026-10-08
+> **最近同步**：2026-10-09 同步 **P1（B3 RASP 运行时接通，提交 `2242f5d`）** 状态——见第 0 / 7.1 / 7.4 / 10.1 / 11 章
 > **读者指引**：决策者读第 0、1、2、10 章；开发 / AI 协作方读第 3–9、11 章与附录
 > **许可**：本文属 `docs/` 目录，采用 [CC BY-NC-SA 4.0](./LICENSE-DOCS)（禁止商用、需署名、相同方式共享）
 
@@ -13,7 +14,7 @@
 |---|---|---|
 | 1 | 项目已形成稳定的「**零构建 dev 态 + esbuild 发布态**」双形态混合架构，这是它最核心的架构特征，也是全部设计约束的源头 | 基线 |
 | 2 | 安全架构（加密保险库 / 生物锁 / 应用锁 / 反篡改 / 混淆）**代码质量扎实**，双层密钥与 21 万轮 PBKDF2 均达 OWASP 量级 | 基线 |
-| 3 | **反篡改模块（B3）从未被运行时调用**——只在单测与离线校验脚本里跑过，真机上属于"装了没开" | **P1** |
+| 3 | 反篡改模块（B3）RASP 六类检测已在 **P1 接通运行时调用**（此前"装了没开"，只在单测跑过）；默认仅告警不阻断 | ✅ 已修复 |
 | 4 | `src/index.ts` 存在**两套并存的导出路径**（手工聚合对象 + `export * as ns`），当前现网侥幸走对了那条，但这是脆弱设计 | **P2** |
 | 5 | `typecheck` 质量门**只覆盖 `src/` 的 6 个 TS 文件**，`assets/` 下约 5 000 行 vanilla 主力代码不在门内 | **P2** |
 | 6 | 三个校验脚本（`_verify_obf.js` / `chaincheck.js` / `bundlecheck.js`）游离在仓库根目录，未接入 `npm test` | P3 |
@@ -341,7 +342,7 @@ graph LR
 |---|---|---|---|
 | **B1** | 加密保险库 | `crypto-vault.ts` + `secure-store.ts`，AES-GCM-256 + PBKDF2-SHA256 210k | ✅ |
 | **B2** | 三重解锁 | 主密码 + 生物锁（Keystore）+ 应用锁（离场 >2 分钟回前台重验） | ✅ |
-| **B3** | 反逆向 | `javascript-obfuscator` 混淆 + `anti-tamper.ts` RASP | ⚠️ **RASP 未接线**（见 10.1） |
+| **B3** | 反逆向 | `javascript-obfuscator` 混淆 + `anti-tamper.ts` RASP 运行时自检 | ✅ **RASP 已接线**（P1，见 10.1） |
 | **B4** | WebView 硬化 | CSP 收紧、`nosniff`、`no-referrer`、`form-action 'none'`、签名出包 | ✅ |
 | **B5** | 安全自审 | OWASP MASVS v2.1 八类逐条对照（见 `SECURITY-AUDIT-v1.0.0.md`） | ✅ |
 
@@ -375,7 +376,7 @@ object-src 'none' · base-uri 'self' · frame-ancestors 'none' · form-action 'n
 |---|---|
 | STORAGE / CRYPTO / AUTH / NETWORK / CODE / PRIVACY | ✅ Met |
 | PLATFORM（WebView 文件访问依赖 Capacitor 默认，待真机复核） | 🟡 Partial |
-| RESILIENCE（原生级 RASP 未引入） | 🟡 Partial |
+| RESILIENCE（JS 级 RASP 已接线；原生级 Root/重打包检测仍未引入，见 7.3） | 🟡 Partial |
 
 ---
 
@@ -430,15 +431,22 @@ object-src 'none' · base-uri 'self' · frame-ancestors 'none' · form-action 'n
 
 > 本章为本次架构审查**新发现**的问题，按严重程度排序。每条都标注了影响、证据与建议。
 
-### 10.1 【P1】反篡改模块（B3）从未被运行时调用
+### 10.1 【P1 · ✅ 已修复】反篡改模块（B3）运行时调用
 
-**现象**：`anti-tamper.ts` 的 `detectThreats()` / `guard()` 只在 `test_antitamper.js` 与 `_verify_obf.js` 中被调用，`assets/app.js` 全文**没有任何 `antiTamper` / `detectThreats` / `guard` 引用**。
+> **状态（2026-10-09 同步）**：本项已在 **P1** 修复并合并（提交 `2242f5d`）。下方保留原始发现记录供追溯。
 
-**证据**：全仓库 grep，运行时代码零命中（仅 `src/` 内部与两个测试/校验脚本）。
+**原现象**：`anti-tamper.ts` 的 `detectThreats()` / `guard()` 只在 `test_antitamper.js` 与 `_verify_obf.js` 中被调用，`assets/app.js` 全文**没有任何 `antiTamper` / `detectThreats` / `guard` 引用**。
 
-**影响**：v1.0.1 与 v1.1.x 对外宣称的「运行时反篡改自检」在真机上**一次都没执行过**。注入框架检测、核心层完整性校验、调试器探针全部处于"装了没开"状态。安全自审报告里 RESILIENCE 被评为 Partial，实际运行时连那 Partial 都没落地。
+**原影响**：v1.0.1 与 v1.1.x 对外宣称的「运行时反篡改自检」在真机上**一次都没执行过**（"装了没开"），MASVS RESILIENCE 自评的 Partial 连运行时都没落地。
 
-**建议**：在 `boot()` 或 `startupSequence()` 中插入一次 `ShiNianCore.antiTamper.guard()`。注意两点：① 默认只告警不阻断（`blockOnNonNative` / `blockOnHighRisk` 均为 `false`），接线上不会误伤用户；② 网页部署版必然命中 `NOT_NATIVE`（+30 分），需按形态决定是否跳过该项，否则主站控制台会持续报"运行环境异常"。
+**修复方式（P1，提交 `2242f5d`）**：
+- `src/anti-tamper.ts`：`GuardOptions` 新增 `skipNotNative`；`detectThreats()` 支持跳过 `NOT_NATIVE`；`guard()` 透传。
+- `assets/app.js`：`startupSequence()` 开头接通 `ShiNianCore.antiTamper.guard()`，按形态判断——dev 态（`file://`，无 `ShiNianCore`）判空跳过；APK 态全套检测；网页部署版传 `skipNotNative:true` 跳过 `NOT_NATIVE` 噪音。
+- `test_antitamper.js`：补场景 13/14 覆盖 `skipNotNative`。
+
+**加固效果**：RASP 六类检测（NOT_NATIVE / WEBDRIVER / DEVTOOLS / DEBUGGER / INJECTION / CORE_TAMPERED）现网真正执行；默认 `blockOnNonNative` / `blockOnHighRisk` 保持 `false`，**仅告警不阻断**，接线上零误伤。验证：`node test_antitamper.js` 15/15、`npm run typecheck` 0 错、`build:release` 产物经 `_verify_obf.js` 的 antiTamper 4 项全过。
+
+**残余取舍**：原生级 RASP（Root / 重打包 / 签名校验）仍未引入，理由见 7.3；故 MASVS RESILIENCE 仍为 Partial，但运行时已落地 JS 级自检。
 
 ### 10.2 【P2】`src/index.ts` 两套导出路径并存，实际取值依赖作用域语义
 
@@ -498,7 +506,7 @@ export * as secureStore from './secure-store';
 
 | 优先级 | 动作 | 收益 | 成本 |
 |---|---|---|---|
-| 1 | 接通 `antiTamper.guard()`（10.1） | 让已写好的安全能力真正生效 | 低（数行代码 + 形态判断） |
+| 1 | ~~接通 `antiTamper.guard()`（10.1）~~ **✅ 已在 P1 完成** | 让已写好的安全能力真正生效 | 低（数行代码 + 形态判断） |
 | 2 | 收敛 `src/index.ts` 双导出路径（10.2） | 消除静默失效隐患 | 低（删掉聚合对象 + 补断言测试） |
 | 3 | `_verify_obf.js` 接入 CI（10.4） | 发布态产物每次自动验证 | 低 |
 | 4 | 给 `weather.js` 等小文件加 `@ts-check`（10.3） | 类型门开始覆盖存量代码 | 中（需逐个消错） |
