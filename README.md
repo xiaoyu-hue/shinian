@@ -11,6 +11,18 @@
 
 ---
 
+<div align="center">
+
+![Build APK](https://img.shields.io/github/actions/workflow/status/xiaoyu-hue/shinian/build-apk.yml?style=flat&label=Build%20APK)
+![CodeQL](https://img.shields.io/github/actions/workflow/status/xiaoyu-hue/shinian/codeql.yml?style=flat&label=CodeQL)
+![Semgrep](https://img.shields.io/github/actions/workflow/status/xiaoyu-hue/shinian/semgrep.yml?style=flat&label=Semgrep)
+![Gitleaks](https://img.shields.io/github/actions/workflow/status/xiaoyu-hue/shinian/gitleaks.yml?style=flat&label=Gitleaks)
+![Release](https://img.shields.io/github/v/release/xiaoyu-hue/shinian?style=flat)
+![Last Commit](https://img.shields.io/github/last-commit/xiaoyu-hue/shinian?style=flat)
+![MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+</div>
+
 ## ✨ 功能（v1.1.3 当前版本）
 
 - **天空引擎 · 天文驱动**：黎明 / 清晨 / 正午 / 午后 / 日落 / 暮色 / 深夜，七时段色阶分钟级连续插值。锚点由**真实日出日落时间**动态计算——同一时刻，冬天和夏天看到的是不一样的天

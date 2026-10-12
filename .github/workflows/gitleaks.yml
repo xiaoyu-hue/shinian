@@ -1,8 +1,15 @@
 name: Gitleaks Secret Scan
 
-# 密钥/凭证扫描：扫完整 git 历史 + 工作树，防凭证泄露推上仓库。
+# 密钥/凭证扫描：push/PR 时运行 gitleaks，检出结果上传 Security 页。
 # 直接回应此前 token 明文暴露事件——配合仓库 Settings 的 Secret Scanning
 # + Push Protection（公开仓库免费）形成双保险。
+#
+# 已知边界（2026-10-12 修复误报后如实记录）：gitleaks-action 在 push 事件下
+# 只扫描事件载荷中的 commits。经 GitHub API 更新 ref（如 Web 端编辑、API 提交）
+# 时载荷 commits 为空，action 打印 "No commits to scan" 后直接跳过、不生成
+# results.sarif——此时扫描实际未执行，由 Secret Scanning + Push Protection 兜底；
+# 本地 git push 场景正常生效。此前该跳过会导致下一步 SARIF 上传报
+# "Path does not exist" 而误报红叉，已用空 SARIF 兜底修复。
 on:
   push:
     branches: [main]
@@ -31,6 +38,18 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
           # 仅报警不阻塞 PR（避免历史误报卡死流水线）；严重泄露请人工处理
           GITLEAKS_ENABLE_UPLOAD_SARIF: "true"
+
+      # push 事件经 API 更新 ref 时 event.commits 为空，gitleaks-action 会跳过
+      # 扫描且不生成 results.sarif（见文件头注释）。此处兜底：缺失时生成一个
+      # 合法的空 SARIF，避免上传步骤报 "Path does not exist" 误报红叉。
+      # 注意：真实泄露仍由 gitleaks 步骤自身非零退出失败，不会被此兜底掩盖。
+      - name: Ensure SARIF file exists
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f results.sarif ]; then
+            printf '%s' '{"$schema":"https://json.schemastore.org/sarif-2.1.0.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"gitleaks","informationUri":"https://github.com/gitleaks/gitleaks","rules":[]}},"results":[]}]}' > results.sarif
+          fi
 
       - name: Upload SARIF to Security tab
         if: always()
