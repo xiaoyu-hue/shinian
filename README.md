@@ -19,7 +19,7 @@
 ![Gitleaks](https://img.shields.io/github/actions/workflow/status/xiaoyu-hue/shinian/gitleaks.yml?style=flat&label=Gitleaks)
 ![Release](https://img.shields.io/github/v/release/xiaoyu-hue/shinian?style=flat)
 ![Last Commit](https://img.shields.io/github/last-commit/xiaoyu-hue/shinian?style=flat)
-![MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)
 
 </div>
 
@@ -229,8 +229,10 @@ v0.7 的云与日月同样为**自研实现**，下列项目**未被引入**（�
 
 本项目采用双许可证：
 
-- **代码**（`*.html`、`*.css`、`*.js` 等）使用 [MIT](./LICENSE) 许可证
+- **代码**（`*.html`、`*.css`、`*.js` 等）使用 [Apache-2.0](./LICENSE) 许可证——含显式专利授权与商标条款，商用、修改、再分发均可，需保留版权与 NOTICE 声明
 - **文档**（`docs/` 目录、`README.md`）使用 [CC BY-NC-SA 4.0](./LICENSE-DOCS) 许可证——可自由分享与演绎，但禁止商用，且需署名并以相同方式共享
+
+> 许可变更记录：v1.1.3 及更早版本以 **MIT** 发布；自本次变更起代码改用 **Apache-2.0**（已发布版本的 MIT 授权不可撤销，仍对当时版本有效）。
 
 © 2026 xiaoyu-hue
 
