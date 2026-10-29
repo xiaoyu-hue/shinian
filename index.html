@@ -18,6 +18,8 @@
 <meta name="theme-color" content="#04111d">
 <meta name="shinian-version" content="dev">
 <title>时念 · ShiNian</title>
+<!-- P0：设计令牌（先于 style.css 引入，作为尺度/圆角/阴影/动效/层级的单一来源） -->
+<link rel="stylesheet" href="assets/tokens.css">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/cities.js" defer></script>
 <script src="assets/lunar.js" defer></script>
@@ -67,304 +69,410 @@
   <div class="rain-canvas" id="rainCanvas" aria-hidden="true"></div>
   <div class="snow-canvas" id="snowCanvas" aria-hidden="true"></div>
 
-  <main>
-    <!-- 左列容器：手机上是普通竖排；宽屏/横屏时与时钟同列 -->
-    <div class="col-left">
-      <!-- 时钟卡 -->
-      <section class="hero">
-      <div class="glass clock-card" role="group" aria-label="当前时间">
-        <div class="eyebrow" id="phaseName">—</div>
-        <div class="clock" id="clock" aria-hidden="true">
-          <span id="hh">--</span><span class="colon">:</span><span id="mm">--</span><span class="sec" id="ss">--</span>
-        </div>
-        <div class="date-line" id="dateLine">载入中…</div>
-        <div class="weather-line" id="weatherLine" hidden>
-          <span class="weather-icon" id="weatherIcon"></span>
-          <span class="weather-temp" id="weatherTemp"></span>
-        </div>
-      </div>
-    </section>
+  <main id="appMain">
 
-    <!-- 城市选择 -->
-    <div class="city-bar" id="cityBar">
-      <button type="button" class="city-btn" id="cityBtn" aria-label="选择城市"
-              aria-haspopup="true" aria-expanded="false">
-        <span class="city-pin">📍</span>
-        <span class="city-label" id="cityLabel">北京</span>
-        <span class="city-chev">▾</span>
-      </button>
-      <button type="button" class="refresh-btn" id="refreshWeather" aria-label="刷新天气">↻</button>
-      <button type="button" class="settings-btn" id="settingsBtn" aria-label="设置与数据"
-              aria-haspopup="true" aria-expanded="false">⚙</button>
-
-      <!-- 设置与数据面板 -->
-      <div class="settings-drop" id="settingsDrop" hidden data-trigger="settingsBtn">
-        <div class="set-block">
-          <div class="set-label">玻璃配方</div>
-          <div class="set-seg" id="recipeSeg" role="group" aria-label="玻璃配方">
-            <button type="button" data-v="auto" class="on">跟随天空</button>
-            <button type="button" data-v="light">亮</button>
-            <button type="button" data-v="dark">暗</button>
+    <!-- ============ 窗 · 主页（天空 + 时钟 + 城市） ============ -->
+    <section class="tabpanel is-active" id="panel-window" data-tab="window" aria-label="窗">
+      <div class="col-left">
+        <!-- 时钟卡 -->
+        <section class="hero">
+        <div class="glass clock-card" role="group" aria-label="当前时间">
+          <div class="eyebrow" id="phaseName">—</div>
+          <div class="clock" id="clock" aria-hidden="true">
+            <span id="hh">--</span><span class="colon">:</span><span id="mm">--</span><span class="sec" id="ss">--</span>
+          </div>
+          <div class="date-line" id="dateLine">载入中…</div>
+          <div class="weather-line" id="weatherLine" hidden>
+            <span class="weather-icon" id="weatherIcon"></span>
+            <span class="weather-temp" id="weatherTemp"></span>
           </div>
         </div>
+      </section>
 
-        <div class="set-block">
-          <label class="set-row" for="motionToggle">
-            <span>微交互</span>
-            <button type="button" class="set-toggle on" id="motionToggle"
-                    role="switch" aria-checked="true" aria-label="微交互"></button>
-          </label>
-          <label class="set-row" for="decorToggle">
-            <span>天空装饰层</span>
-            <button type="button" class="set-toggle on" id="decorToggle"
-                    role="switch" aria-checked="true" aria-label="天空装饰层"></button>
-          </label>
-        </div>
-
-        <div class="set-block">
-          <label class="set-row" for="cloudToggle">
-            <span>云彩</span>
-            <button type="button" class="set-toggle on" id="cloudToggle"
-                    role="switch" aria-checked="true" aria-label="云彩"></button>
-          </label>
-          <div class="remind-fields" id="cloudFields">
-            <label class="set-row">
-              <span>云量</span>
-              <select id="cloudAmount" class="set-input set-select">
-                <option value="auto">跟随天气</option>
-                <option value="sparse">疏</option>
-                <option value="normal">适中</option>
-                <option value="dense">密</option>
-              </select>
-            </label>
-            <label class="set-row">
-              <span>空窗期</span>
-              <select id="cloudGap" class="set-input set-select">
-                <option value="off">连续有云</option>
-                <option value="short">短（约 15 秒）</option>
-                <option value="mid">中（约 30 秒）</option>
-                <option value="long">长（约 50 秒）</option>
-              </select>
-            </label>
-            <p class="set-note">空窗期＝云飘过后留一段澄澈天空，再迎来下一批云。「连续有云」则云不中断。</p>
-          </div>
-        </div>
-
-        <div class="set-block">
-          <label class="set-row" for="meteorToggle">
-            <span>流星</span>
-            <button type="button" class="set-toggle on" id="meteorToggle"
-                    role="switch" aria-checked="true" aria-label="流星"></button>
-          </label>
-          <div class="remind-fields" id="meteorFields">
-            <label class="set-row">
-              <span>出现间隔</span>
-              <select id="meteorRate" class="set-input set-select">
-                <option value="real">真实（40–90 秒随机）</option>
-                <option value="30">常见（约 30 秒）</option>
-                <option value="12">频繁（约 12 秒）</option>
-                <option value="custom">自定义…</option>
-              </select>
-            </label>
-            <label class="set-row" id="meteorCustomRow" hidden>
-              <span>自定义秒数</span>
-              <input type="number" id="meteorGap" class="set-input narrow"
-                     min="5" max="300" step="1" value="30">
-            </label>
-            <p class="set-note">流星只在夜间出现；实际间隔会在设定值上下浮动 ±30%，保留偶遇感。划过时轻点它可展开许愿池。</p>
-          </div>
-        </div>
-
-        <div class="set-block">
-          <div class="set-label">天气</div>
-          <label class="set-row" for="weatherRefreshMin">
-            <span>温度自动刷新</span>
-            <select id="weatherRefreshMin" class="set-input set-select">
-              <option value="0">关闭</option>
-              <option value="5">每 5 分钟</option>
-              <option value="10">每 10 分钟</option>
-              <option value="15">每 15 分钟</option>
-              <option value="30">每 30 分钟</option>
-            </select>
-          </label>
-          <p class="set-note">实时温度按所选间隔自动更新；切到后台自动暂停，回到前台立即刷新一次。</p>
-        </div>
-
-        <div class="set-block" id="encStoreBlock">
-          <label class="set-row" for="encToggle">
-            <span>加密存储</span>
-            <button type="button" class="set-toggle" id="encToggle"
-                    role="switch" aria-checked="false" aria-label="加密存储"></button>
-          </label>
-          <p class="set-note" id="encStoreNote">开启后本地数据用主密码加密（AES-GCM-256），设备丢失也无法读取；需先设置主密码。开启即把现有数据迁为加密。移动端默认强制开启。</p>
-        </div>
-
-        <div class="set-block" id="appLockBlock">
-          <label class="set-row" for="appLockToggle">
-            <span>应用锁（回前台验证）</span>
-            <button type="button" class="set-toggle" id="appLockToggle"
-                    role="switch" aria-checked="true" aria-label="应用锁"></button>
-          </label>
-          <p class="set-note" id="appLockNote">离开页面超过 2 分钟后再回来时，需输入主密码（或生物锁）解锁。移动端始终开启。</p>
-        </div>
-
-        <div class="set-block" id="aboutBlock">
-          <div class="set-row">
-            <span>当前版本 <b id="appVersion">—</b></span>
-            <button type="button" class="set-btn" id="checkUpdateBtn">检查更新</button>
-          </div>
-          <p class="set-note" id="updateNote" hidden></p>
-        </div>
-
-        <div class="set-block">
-          <div class="set-label">数据 · 共 <span id="itemCount">0</span> 条念想</div>
-          <div class="set-actions">
-            <button type="button" class="set-btn" id="exportCopy">复制备份文本</button>
-            <button type="button" class="set-btn" id="exportFile">下载备份文件</button>
-            <button type="button" class="set-btn" id="exportEncFile">下载加密备份</button>
-            <button type="button" class="set-btn" id="importBtn">导入恢复</button>
-            <button type="button" class="set-btn danger" id="clearBtn">清空全部</button>
-          </div>
-          <p class="set-note" id="encBackupNote" hidden>加密备份用主密码加密（AES-GCM-256），即使同步到云盘也不泄露；导入时需输入同一主密码。仅部署版/App 可用。</p>
-          <input type="file" id="importFile" accept="application/json,.json" hidden>
-          <p class="set-hint" id="setHint" hidden></p>
-        </div>
-      </div>
-
-      <div class="city-drop" id="cityDrop" hidden data-trigger="cityBtn">
-        <input type="text" class="city-search" id="citySearch" placeholder="搜索城市…" autocomplete="off">
-        <ul class="city-list" id="cityList"></ul>
-      </div>
-    </div>
-    </div>
-
-    <!-- 倒数日 -->
-    <section class="countdown" aria-label="倒数日">
-      <h2 class="section-title">念想 · 倒数日</h2>
-
-      <form id="cdForm" class="glass card form-card">
-        <label class="sr-only" for="cdName">念想的名字</label>
-        <input id="cdName" name="name" type="text" required maxlength="30"
-               placeholder="记一个念想（如：回家 / 生日 / 出发）" autocomplete="off">
-        <label class="sr-only" for="cdDate">日期</label>
-        <input id="cdDate" name="date" type="date" required>
-        <div class="form-actions">
-          <button type="submit" class="btn" id="cdSubmit">记下这个日子</button>
-          <button type="button" class="btn-cancel" id="cdCancel" hidden>取消编辑</button>
-        </div>
-      </form>
-
-      <ul id="cdList" class="cd-list"></ul>
-
-      <div id="cdEmpty" class="glass card empty" hidden>
-        还没有念想。挑一个日子——生日、约定，或者任何你在等的东西。
-      </div>
-    </section>
-    <!-- 许愿池（v0.5.9）：备忘录式心愿清单 -->
-    <section class="wishes" aria-label="许愿池">
-      <h2 class="section-title">许愿池</h2>
-
-      <div class="glass card wish-card">
-        <button type="button" class="wish-summary" id="wishSummary"
-                aria-expanded="false" aria-controls="wishBody">
-          <span>已许下 <b id="wishTotal">0</b> 个心愿 · 实现 <b id="wishDone">0</b> 个</span>
-          <span class="wish-chevron" aria-hidden="true">▾</span>
+      <!-- 城市选择 / 刷新 / 设置入口 -->
+      <div class="city-bar" id="cityBar">
+        <button type="button" class="city-btn" id="cityBtn" aria-label="选择城市"
+                aria-haspopup="dialog" aria-expanded="false">
+          <span class="city-pin">📍</span>
+          <span class="city-label" id="cityLabel">北京</span>
+          <span class="city-chev">▾</span>
         </button>
+        <button type="button" class="refresh-btn" id="refreshWeather" aria-label="刷新天气">↻</button>
+        <!-- 齿轮：跳转到「我的」标签内的设置（苹果惯例：设置收进「我的」，不为其单独占一个 tab） -->
+        <button type="button" class="settings-btn" id="settingsBtn" aria-label="设置与数据"
+                data-goto="me">⚙</button>
+      </div>
+      </div>
+    </section>
 
-        <div class="wish-body" id="wishBody" hidden>
-          <form id="wishForm" class="wish-form">
-            <label class="sr-only" for="wishText">写下一个心愿</label>
-            <input id="wishText" type="text" maxlength="40"
-                   placeholder="想吃点什么、想去哪里…" autocomplete="off">
-            <label class="sr-only" for="wishDate">打算哪天（可选）</label>
-            <input id="wishDate" type="date">
-            <button type="submit" class="btn" id="wishSubmit">许下</button>
+    <!-- ============ 念想 · 倒数日 ============ -->
+    <section class="tabpanel" id="panel-wishes" data-tab="wishes" aria-label="念想" hidden>
+      <div class="panel-inner">
+        <header class="panel-head">
+          <h1 class="panel-title">念想</h1>
+          <p class="panel-sub">记下你在等的每一个日子</p>
+        </header>
+
+        <section class="countdown" aria-label="倒数日">
+          <form id="cdForm" class="glass card form-card">
+            <label class="sr-only" for="cdName">念想的名字</label>
+            <input id="cdName" name="name" type="text" required maxlength="30"
+                   placeholder="记一个念想（如：回家 / 生日 / 出发）" autocomplete="off">
+            <label class="sr-only" for="cdDate">日期</label>
+            <input id="cdDate" name="date" type="date" required>
+            <div class="form-actions">
+              <button type="submit" class="btn" id="cdSubmit">记下这个日子</button>
+              <button type="button" class="btn-cancel" id="cdCancel" hidden>取消编辑</button>
+            </div>
           </form>
 
-          <ul id="wishList" class="wish-list"></ul>
+          <ul id="cdList" class="cd-list"></ul>
 
-          <div id="wishEmpty" class="wish-empty" hidden>
-            还没有心愿。想到什么就记一笔——做到了再回来打勾。
+          <div id="cdEmpty" class="glass card empty" hidden>
+            还没有念想。挑一个日子——生日、约定，或者任何你在等的东西。
+          </div>
+        </section>
+
+        <!-- 提醒（喝水 + 倒数日）：从设置面板下放，与念想相邻 -->
+        <section class="remind" aria-label="提醒">
+          <h2 class="section-title">提醒</h2>
+
+          <div class="glass card remind-card">
+            <button type="button" class="remind-summary" id="remindSummary"
+                    aria-expanded="false" aria-controls="remindBody">
+              <span id="remindSummaryText">提醒 · 轻点展开设置</span>
+              <span class="remind-chevron" aria-hidden="true">▾</span>
+            </button>
+
+            <div class="remind-body" id="remindBody" hidden>
+              <p class="remind-hint" id="remindHint">系统通知需安装安卓 App 才会弹出；网页版仅保存设置。</p>
+
+              <div class="remind-block">
+                <label class="set-row" for="remindToggle">
+                  <span>喝水提醒</span>
+                  <button type="button" class="set-toggle" id="remindToggle"
+                          role="switch" aria-checked="false" aria-label="喝水提醒"></button>
+                </label>
+                <div class="remind-fields" id="waterFields">
+                  <label class="set-row">
+                    <span>每隔（小时）</span>
+                    <input type="number" id="remindInterval" class="set-input narrow"
+                           min="0.5" max="12" step="0.5" value="2">
+                  </label>
+                  <label class="set-row">
+                    <span>安静时段（停止—开始）</span>
+                    <span class="set-input-group">
+                      <input type="number" id="remindQuietStart" class="set-input narrow" min="0" max="23" value="22">–
+                      <input type="number" id="remindQuietEnd" class="set-input narrow" min="0" max="23" value="8">
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="remind-block">
+                <label class="set-row" for="cdRemindToggle">
+                  <span>倒数日提醒</span>
+                  <button type="button" class="set-toggle" id="cdRemindToggle"
+                          role="switch" aria-checked="false" aria-label="倒数日提醒"></button>
+                </label>
+                <div class="remind-fields" id="cdFields">
+                  <label class="set-row">
+                    <span>提前一天（提醒「明天是…」）</span>
+                    <input type="time" id="cdLeadTime" class="set-input" value="20:00">
+                  </label>
+                  <label class="set-row">
+                    <span>当天（提醒「今天是…」）</span>
+                    <input type="time" id="cdRemindTime" class="set-input" value="08:00">
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 悬浮新增按钮 -->
+        <button type="button" class="fab" id="wishesFab" aria-label="添加念想">＋</button>
+      </div>
+    </section>
+
+    <!-- ============ 许愿 · 心愿池 ============ -->
+    <section class="tabpanel" id="panel-pool" data-tab="pool" aria-label="许愿" hidden>
+      <div class="panel-inner">
+        <header class="panel-head">
+          <h1 class="panel-title">许愿池</h1>
+          <p class="panel-sub">想到什么就记一笔，做到了再回来打勾</p>
+        </header>
+
+        <!-- 许愿池（v0.5.9）：备忘录式心愿清单 -->
+        <section class="wishes" aria-label="许愿池">
+          <div class="glass card wish-card">
+            <button type="button" class="wish-summary" id="wishSummary"
+                    aria-expanded="false" aria-controls="wishBody">
+              <span>已许下 <b id="wishTotal">0</b> 个心愿 · 实现 <b id="wishDone">0</b> 个</span>
+              <span class="wish-chevron" aria-hidden="true">▾</span>
+            </button>
+
+            <div class="wish-body" id="wishBody" hidden>
+              <form id="wishForm" class="wish-form">
+                <label class="sr-only" for="wishText">写下一个心愿</label>
+                <input id="wishText" type="text" maxlength="40"
+                       placeholder="想吃点什么、想去哪里…" autocomplete="off">
+                <label class="sr-only" for="wishDate">打算哪天（可选）</label>
+                <input id="wishDate" type="date">
+                <button type="submit" class="btn" id="wishSubmit">许下</button>
+              </form>
+
+              <ul id="wishList" class="wish-list"></ul>
+
+              <div id="wishEmpty" class="wish-empty" hidden>
+                还没有心愿。想到什么就记一笔——做到了再回来打勾。
+              </div>
+
+              <div class="wish-remind">
+                <label class="set-row" for="wishRemindToggle">
+                  <span>到期当天提醒</span>
+                  <button type="button" class="set-toggle" id="wishRemindToggle"
+                          role="switch" aria-checked="true" aria-label="到期当天提醒"></button>
+                </label>
+                <label class="set-row">
+                  <span>提醒时间</span>
+                  <input type="time" id="wishTime" class="set-input" value="09:00">
+                </label>
+              </div>
+
+              <div class="wish-actions">
+                <button type="button" class="btn-cancel" id="wishClearDone" hidden>清空已完成</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <button type="button" class="fab" id="poolFab" aria-label="添加心愿">＋</button>
+      </div>
+    </section>
+
+    <!-- ============ 我的 · 设置 / 安全 / 数据 / 关于 ============ -->
+    <section class="tabpanel" id="panel-me" data-tab="me" aria-label="我的" hidden>
+      <div class="panel-inner">
+        <header class="me-head">
+          <div class="me-avatar" aria-hidden="true">时</div>
+          <div class="me-id">
+            <div class="me-name">时念 · ShiNian</div>
+            <div class="me-meta" id="meMeta">让时间，变成一片会呼吸的窗</div>
+          </div>
+        </header>
+
+        <!-- 设置面板（原 settingsDrop，迁入「我的」作为整页静态面板） -->
+        <div class="settings-page" id="settingsDrop">
+
+          <div class="me-group-title">外观</div>
+
+          <div class="set-block">
+            <div class="set-label">玻璃配方</div>
+            <div class="set-seg" id="recipeSeg" role="group" aria-label="玻璃配方">
+              <button type="button" data-v="auto" class="on">跟随天空</button>
+              <button type="button" data-v="light">亮</button>
+              <button type="button" data-v="dark">暗</button>
+            </div>
           </div>
 
-          <div class="wish-remind">
-            <label class="set-row" for="wishRemindToggle">
-              <span>到期当天提醒</span>
-              <button type="button" class="set-toggle" id="wishRemindToggle"
-                      role="switch" aria-checked="true" aria-label="到期当天提醒"></button>
+          <div class="set-block">
+            <label class="set-row" for="motionToggle">
+              <span>微交互</span>
+              <button type="button" class="set-toggle on" id="motionToggle"
+                      role="switch" aria-checked="true" aria-label="微交互"></button>
             </label>
-            <label class="set-row">
-              <span>提醒时间</span>
-              <input type="time" id="wishTime" class="set-input" value="09:00">
+            <label class="set-row" for="decorToggle">
+              <span>天空装饰层</span>
+              <button type="button" class="set-toggle on" id="decorToggle"
+                      role="switch" aria-checked="true" aria-label="天空装饰层"></button>
             </label>
           </div>
 
-          <div class="wish-actions">
-            <button type="button" class="btn-cancel" id="wishClearDone" hidden>清空已完成</button>
+          <div class="set-block">
+            <label class="set-row" for="cloudToggle">
+              <span>云彩</span>
+              <button type="button" class="set-toggle on" id="cloudToggle"
+                      role="switch" aria-checked="true" aria-label="云彩"></button>
+            </label>
+            <div class="remind-fields" id="cloudFields">
+              <label class="set-row">
+                <span>云量</span>
+                <select id="cloudAmount" class="set-input set-select">
+                  <option value="auto">跟随天气</option>
+                  <option value="sparse">疏</option>
+                  <option value="normal">适中</option>
+                  <option value="dense">密</option>
+                </select>
+              </label>
+              <label class="set-row">
+                <span>空窗期</span>
+                <select id="cloudGap" class="set-input set-select">
+                  <option value="off">连续有云</option>
+                  <option value="short">短（约 15 秒）</option>
+                  <option value="mid">中（约 30 秒）</option>
+                  <option value="long">长（约 50 秒）</option>
+                </select>
+              </label>
+              <p class="set-note">空窗期＝云飘过后留一段澄澈天空，再迎来下一批云。「连续有云」则云不中断。</p>
+            </div>
+          </div>
+
+          <div class="set-block">
+            <label class="set-row" for="meteorToggle">
+              <span>流星</span>
+              <button type="button" class="set-toggle on" id="meteorToggle"
+                      role="switch" aria-checked="true" aria-label="流星"></button>
+            </label>
+            <div class="remind-fields" id="meteorFields">
+              <label class="set-row">
+                <span>出现间隔</span>
+                <select id="meteorRate" class="set-input set-select">
+                  <option value="real">真实（40–90 秒随机）</option>
+                  <option value="30">常见（约 30 秒）</option>
+                  <option value="12">频繁（约 12 秒）</option>
+                  <option value="custom">自定义…</option>
+                </select>
+              </label>
+              <label class="set-row" id="meteorCustomRow" hidden>
+                <span>自定义秒数</span>
+                <input type="number" id="meteorGap" class="set-input narrow"
+                       min="5" max="300" step="1" value="30">
+              </label>
+              <p class="set-note">流星只在夜间出现；实际间隔会在设定值上下浮动 ±30%，保留偶遇感。划过时轻点它可展开许愿池。</p>
+            </div>
+          </div>
+
+          <div class="set-block">
+            <div class="set-label">天气</div>
+            <label class="set-row" for="weatherRefreshMin">
+              <span>温度自动刷新</span>
+              <select id="weatherRefreshMin" class="set-input set-select">
+                <option value="0">关闭</option>
+                <option value="5">每 5 分钟</option>
+                <option value="10">每 10 分钟</option>
+                <option value="15">每 15 分钟</option>
+                <option value="30">每 30 分钟</option>
+              </select>
+            </label>
+            <p class="set-note">实时温度按所选间隔自动更新；切到后台自动暂停，回到前台立即刷新一次。</p>
+          </div>
+
+          <div class="me-group-title">安全</div>
+
+          <div class="set-block" id="encStoreBlock">
+            <label class="set-row" for="encToggle">
+              <span>加密存储</span>
+              <button type="button" class="set-toggle" id="encToggle"
+                      role="switch" aria-checked="false" aria-label="加密存储"></button>
+            </label>
+            <p class="set-note" id="encStoreNote">开启后本地数据用主密码加密（AES-GCM-256），设备丢失也无法读取；需先设置主密码。开启即把现有数据迁为加密。移动端默认强制开启。</p>
+          </div>
+
+          <div class="set-block" id="appLockBlock">
+            <label class="set-row" for="appLockToggle">
+              <span>应用锁（回前台验证）</span>
+              <button type="button" class="set-toggle" id="appLockToggle"
+                      role="switch" aria-checked="true" aria-label="应用锁"></button>
+            </label>
+            <p class="set-note" id="appLockNote">离开页面超过 2 分钟后再回来时，需输入主密码（或生物锁）解锁。移动端始终开启。</p>
+          </div>
+
+          <div class="me-group-title">关于</div>
+
+          <div class="set-block" id="aboutBlock">
+            <div class="set-row">
+              <span>当前版本 <b id="appVersion">—</b></span>
+              <button type="button" class="set-btn" id="checkUpdateBtn">检查更新</button>
+            </div>
+            <p class="set-note" id="updateNote" hidden></p>
+          </div>
+
+          <div class="me-group-title">数据</div>
+
+          <div class="set-block">
+            <div class="set-label">数据 · 共 <span id="itemCount">0</span> 条念想</div>
+            <div class="set-actions">
+              <button type="button" class="set-btn" id="exportCopy">复制备份文本</button>
+              <button type="button" class="set-btn" id="exportFile">下载备份文件</button>
+              <button type="button" class="set-btn" id="exportEncFile">下载加密备份</button>
+              <button type="button" class="set-btn" id="importBtn">导入恢复</button>
+              <button type="button" class="set-btn danger" id="clearBtn">清空全部</button>
+            </div>
+            <p class="set-note" id="encBackupNote" hidden>加密备份用主密码加密（AES-GCM-256），即使同步到云盘也不泄露；导入时需输入同一主密码。仅部署版/App 可用。</p>
+            <input type="file" id="importFile" accept="application/json,.json" hidden>
+            <p class="set-hint" id="setHint" hidden></p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 提醒（喝水 + 倒数日）：从设置面板下放，与内容相邻 -->
-    <section class="remind" aria-label="提醒">
-      <h2 class="section-title">提醒</h2>
-
-      <div class="glass card remind-card">
-        <button type="button" class="remind-summary" id="remindSummary"
-                aria-expanded="false" aria-controls="remindBody">
-          <span id="remindSummaryText">提醒 · 轻点展开设置</span>
-          <span class="remind-chevron" aria-hidden="true">▾</span>
-        </button>
-
-        <div class="remind-body" id="remindBody" hidden>
-          <p class="remind-hint" id="remindHint">系统通知需安装安卓 App 才会弹出；网页版仅保存设置。</p>
-
-          <div class="remind-block">
-            <label class="set-row" for="remindToggle">
-              <span>喝水提醒</span>
-              <button type="button" class="set-toggle" id="remindToggle"
-                      role="switch" aria-checked="false" aria-label="喝水提醒"></button>
-            </label>
-            <div class="remind-fields" id="waterFields">
-              <label class="set-row">
-                <span>每隔（小时）</span>
-                <input type="number" id="remindInterval" class="set-input narrow"
-                       min="0.5" max="12" step="0.5" value="2">
-              </label>
-              <label class="set-row">
-                <span>安静时段（停止—开始）</span>
-                <span class="set-input-group">
-                  <input type="number" id="remindQuietStart" class="set-input narrow" min="0" max="23" value="22">–
-                  <input type="number" id="remindQuietEnd" class="set-input narrow" min="0" max="23" value="8">
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div class="remind-block">
-            <label class="set-row" for="cdRemindToggle">
-              <span>倒数日提醒</span>
-              <button type="button" class="set-toggle" id="cdRemindToggle"
-                      role="switch" aria-checked="false" aria-label="倒数日提醒"></button>
-            </label>
-            <div class="remind-fields" id="cdFields">
-              <label class="set-row">
-                <span>提前一天（提醒「明天是…」）</span>
-                <input type="time" id="cdLeadTime" class="set-input" value="20:00">
-              </label>
-              <label class="set-row">
-                <span>当天（提醒「今天是…」）</span>
-                <input type="time" id="cdRemindTime" class="set-input" value="08:00">
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <footer class="foot">时念 · ShiNian</footer>
   </main>
+
+  <!-- 手机：底部悬浮玻璃标签栏（常驻主导航） -->
+  <nav class="tabbar" id="tabbar" aria-label="主导航">
+    <button type="button" class="tab is-active" data-tab="window" aria-current="page">
+      <svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></svg>
+      <span class="tab-txt">窗</span>
+    </button>
+    <button type="button" class="tab" data-tab="wishes">
+      <svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="3"/><path d="M3.5 9.5h17M8 3.2v3.6M16 3.2v3.6"/><path d="M12 12.5v4M10 14.5h4"/></svg>
+      <span class="tab-txt">念想</span>
+    </button>
+    <button type="button" class="tab" data-tab="pool">
+      <svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.2l2.3 4.9 5.3.7-3.9 3.8.9 5.4-4.6-2.5-4.6 2.5.9-5.4L4.4 8.8l5.3-.7z"/></svg>
+      <span class="tab-txt">许愿</span>
+    </button>
+    <button type="button" class="tab" data-tab="me">
+      <svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.4" r="3.6"/><path d="M4.8 20.2c0-4 3.3-6.4 7.2-6.4s7.2 2.4 7.2 6.4"/></svg>
+      <span class="tab-txt">我的</span>
+    </button>
+  </nav>
+
+  <!-- 平板 / 桌面：左侧导航 rail（结构性断点，≥820px 接管主导航） -->
+  <nav class="rail" id="rail" aria-label="主导航">
+    <button type="button" class="rail-item is-active" data-tab="window" aria-current="page">
+      <svg class="rail-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.4 4.4l1.7 1.7M17.9 17.9l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.4 19.6l1.7-1.7M17.9 6.1l1.7-1.7"/></svg>
+      <span class="rail-txt">窗</span>
+    </button>
+    <button type="button" class="rail-item" data-tab="wishes">
+      <svg class="rail-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="3"/><path d="M3.5 9.5h17M8 3.2v3.6M16 3.2v3.6"/><path d="M12 12.5v4M10 14.5h4"/></svg>
+      <span class="rail-txt">念想</span>
+    </button>
+    <button type="button" class="rail-item" data-tab="pool">
+      <svg class="rail-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.2l2.3 4.9 5.3.7-3.9 3.8.9 5.4-4.6-2.5-4.6 2.5.9-5.4L4.4 8.8l5.3-.7z"/></svg>
+      <span class="rail-txt">许愿</span>
+    </button>
+    <button type="button" class="rail-item" data-tab="me">
+      <svg class="rail-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.4" r="3.6"/><path d="M4.8 20.2c0-4 3.3-6.4 7.2-6.4s7.2 2.4 7.2 6.4"/></svg>
+      <span class="rail-txt">我的</span>
+    </button>
+  </nav>
+
+  <!-- 城市选择：底部滑出玻璃 Sheet（替代原锚定下拉） -->
+  <div class="sheet-scrim" id="cityScrim" hidden>
+    <div class="sheet" id="citySheet" role="dialog" aria-modal="true" aria-label="选择城市">
+      <div class="sheet-grab" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <span class="sheet-title">选择城市</span>
+        <button type="button" class="sheet-close" id="citySheetClose" aria-label="关闭">✕</button>
+      </div>
+      <input type="text" class="city-search" id="citySearch" placeholder="搜索城市…" autocomplete="off">
+      <ul class="city-list" id="cityList"></ul>
+    </div>
+  </div>
+
+  <!-- 全局轻提示 Toast 宿主 -->
+  <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- 首启轻引导 -->
+  <div id="coach" class="coach" hidden>
+    <div class="coach-card glass">
+      <div class="coach-title">欢迎使用时念</div>
+      <p class="coach-text">底部四个标签随意切换：<b>窗</b>是随时刻流动的天空，<b>念想</b>记下等待的日子，<b>许愿</b>收藏小心愿，<b>我的</b>里调外观、备份数据。</p>
+      <button type="button" class="coach-btn" id="coachOk">开始使用</button>
+    </div>
+  </div>
 
   <!-- B1/B2 · 加密启动守卫 / 应用锁 modal（release 模式加密层可用时弹出；dev/file:// 下不显示） -->
   <div class="vault-modal" id="vaultModal" hidden>

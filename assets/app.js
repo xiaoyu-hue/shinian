@@ -476,14 +476,28 @@
     li.dataset.removing = '1';
     haptic(10);
     // 数据立刻落库：连续快速删除、或动画途中刷新页面都不会出错
-    save(load().filter(function (x) { return x.id !== id; }));
+    var items = load();
+    var removed = items.filter(function (x) { return x.id === id; })[0];
+    save(items.filter(function (x) { return x.id !== id; }));
     var finish = function () { render(); };
     var anim = play(li, [
       { height: li.offsetHeight + 'px', opacity: 1, transform: 'none' },
       { height: '0px', opacity: 0, transform: 'translateX(20px)' }
     ], { duration: 250, easing: 'ease-in' });
-    if (!anim) { finish(); return; }
-    anim.onfinish = finish;
+    if (!anim) { finish(); }
+    else { anim.onfinish = finish; }
+    // P3：删除后给「撤销」机会（大厂标配的危险操作二次确认/可恢复）
+    if (removed) {
+      toast('已删除「' + (removed.name || '念想') + '」', 'ok', {
+        undo: function () {
+          var cur = load();
+          cur.push(removed);
+          save(cur);
+          render();
+          haptic(8);
+        }
+      });
+    }
   }
 
   // 滑动删除（仅触摸设备；鼠标仍用 ✕ 按钮，避免误触）
@@ -643,41 +657,46 @@
       if (currentCity && c.name === currentCity.name) li.className = 'selected';
       li.addEventListener('click', function(){
         saveCity(c);
-        closeDrop(document.getElementById('cityDrop'),
-                  document.getElementById('cityBar'),
-                  document.getElementById('citySearch'));
+        closeCitySheet();
+        toast('已切换到 ' + c.name, 'ok');
       });
       list.appendChild(li);
     });
   }
 
-  // 城市下拉：展开 / 收起带高度动画（不支持的浏览器直接切换，不会报错）
-  function openDrop(drop, bar, search) {
-    closeSettings();          // 与设置面板互斥，同时只开一个
-    drop.hidden = false;
-    var trig = document.getElementById(drop.getAttribute('data-trigger') || '');
-    if (trig) trig.setAttribute('aria-expanded', 'true');   // U2：读屏器感知展开状态
-    bar.classList.add('open');
+  // 城市选择：底部滑出 Sheet（替代原锚定下拉，P1 信息架构重构）
+  var cityOpen = false;
+  function openCitySheet() {
+    var scrim = document.getElementById('cityScrim');
+    var sheet = document.getElementById('citySheet');
+    var search = document.getElementById('citySearch');
+    var btn = document.getElementById('cityBtn');
+    if (!scrim || !sheet) return;
     renderCityList();
-    search.focus();
-    var anim = play(drop, [
-      { height: '0px', opacity: 0 },
-      { height: drop.scrollHeight + 'px', opacity: 1 }
-    ], { duration: 280, easing: EASE });
-    if (anim) anim.onfinish = function () { drop.style.height = ''; };
+    scrim.hidden = false;
+    void scrim.offsetWidth;            // 强制重排，确保过渡触发
+    scrim.classList.add('show');
+    cityOpen = true;
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    if (search) setTimeout(function () { try { search.focus(); } catch (e) {} }, 60);
   }
-  function closeDrop(drop, bar, search) {
-    if (drop.hidden) return;
-    var trig = document.getElementById(drop.getAttribute('data-trigger') || '');
-    if (trig) trig.setAttribute('aria-expanded', 'false');  // U2：读屏器感知收起状态
-    bar.classList.remove('open');
+  function closeCitySheet() {
+    var scrim = document.getElementById('cityScrim');
+    var sheet = document.getElementById('citySheet');
+    var btn = document.getElementById('cityBtn');
+    var search = document.getElementById('citySearch');
+    if (!scrim || scrim.hidden) return;
+    scrim.classList.remove('show');
+    cityOpen = false;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
     if (search) search.value = '';
-    var anim = play(drop, [
-      { height: drop.scrollHeight + 'px', opacity: 1 },
-      { height: '0px', opacity: 0 }
-    ], { duration: 200, easing: 'ease-in' });
-    if (!anim) { drop.hidden = true; return; }
-    anim.onfinish = function () { drop.hidden = true; drop.style.height = ''; };
+    var done = function () { scrim.hidden = true; };
+    if (sheet && sheet.animate) {
+      var t = setTimeout(done, 340);
+      sheet.addEventListener('transitionend', function te() {
+        clearTimeout(t); sheet.removeEventListener('transitionend', te); done();
+      }, { once: true });
+    } else { done(); }
   }
 
   function initCityPicker() {
@@ -685,23 +704,34 @@
     if (saved) currentCity = saved;
     document.getElementById('cityLabel').textContent = currentCity.name;
 
-    var bar = document.getElementById('cityBar');
-    var drop = document.getElementById('cityDrop');
-    var search = document.getElementById('citySearch');
     var btn = document.getElementById('cityBtn');
+    var search = document.getElementById('citySearch');
+    var scrim = document.getElementById('cityScrim');
+    var closeBtn = document.getElementById('citySheetClose');
 
-    btn.addEventListener('click', function(){
-      if (drop.hidden) { openDrop(drop, bar, search); }
-      else { closeDrop(drop, bar, search); }
+    if (btn) btn.addEventListener('click', function () {
+      if (cityOpen) closeCitySheet(); else openCitySheet();
     });
-
-    search.addEventListener('input', function(){
-      renderCityList(search.value);
-    });
-
-    // 点击外部关闭
-    document.addEventListener('click', function(e){
-      if (!bar.contains(e.target)) { closeDrop(drop, bar, search); closeSettings(); }
+    if (closeBtn) closeBtn.addEventListener('click', closeCitySheet);
+    if (scrim) {
+      // 点击遮罩（非 Sheet 本身）关闭
+      scrim.addEventListener('click', function (e) {
+        if (e.target === scrim) closeCitySheet();
+      });
+      // 从 Sheet 顶部向下拖拽关闭（仅触摸）
+      var sy = 0, drag = false;
+      scrim.addEventListener('touchstart', function (e) {
+        if (e.target.closest('.sheet')) { sy = e.touches[0].clientY; drag = true; }
+      }, { passive: true });
+      scrim.addEventListener('touchmove', function (e) {
+        if (!drag) return;
+        if (e.touches[0].clientY - sy > 60) { drag = false; closeCitySheet(); }
+      }, { passive: true });
+      scrim.addEventListener('touchend', function () { drag = false; });
+    }
+    if (search) search.addEventListener('input', function () { renderCityList(search.value); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && cityOpen) closeCitySheet();
     });
 
     document.getElementById('refreshWeather').addEventListener('click', refreshWeather);
@@ -1045,43 +1075,16 @@
       } catch (e) { reject(e); }
     });
   }
-  function closeSettings() {
-    var drop = document.getElementById('settingsDrop');
-    if (!drop || drop.hidden) return;
-    var st = document.getElementById('settingsBtn');
-    if (st) st.setAttribute('aria-expanded', 'false');   // U2：读屏器感知收起状态
-    var a = play(drop, [
-      { height: drop.scrollHeight + 'px', opacity: 1 },
-      { height: '0px', opacity: 0 }
-    ], { duration: 200, easing: 'ease-in' });
-    if (!a) { drop.hidden = true; return; }
-    a.onfinish = function () { drop.hidden = true; drop.style.height = ''; };
-  }
+  // 设置面板已迁入「我的」整页，不再有「收起」动作（保留函数名以免其它引用报错）
+  function closeSettings() { return; }
 
   function initSettings() {
     var btn = document.getElementById('settingsBtn');
     var drop = document.getElementById('settingsDrop');
     if (!btn || !drop) return;
 
-    btn.addEventListener('click', function () {
-      if (drop.hidden) {
-        // 与城市下拉互斥
-        var bar = document.getElementById('cityBar');
-        var cd = document.getElementById('cityDrop');
-        if (cd && !cd.hidden) closeDrop(cd, bar, document.getElementById('citySearch'));
-        drop.hidden = false;
-        var st = document.getElementById('settingsBtn');
-        if (st) st.setAttribute('aria-expanded', 'true');   // U2：读屏器感知展开状态
-        syncSettingsUI();
-        var a = play(drop, [
-          { height: '0px', opacity: 0 },
-          { height: drop.scrollHeight + 'px', opacity: 1 }
-        ], { duration: 280, easing: EASE });
-        if (a) a.onfinish = function () { drop.style.height = ''; };
-      } else {
-        closeSettings();
-      }
-    });
+    // 齿轮跳转「我的」设置页由 initUI 统一处理（P1 信息架构重构）；
+    // 设置面板已迁入「我的」作为整页静态面板，不再需要下拉展开/收起。
 
     // 玻璃配方
     document.getElementById('recipeSeg').addEventListener('click', function (e) {
@@ -1658,6 +1661,7 @@
     safe('tickClock', tickClock);
     setInterval(tickClock, 1000);
     safe('initForm', initForm);
+    safe('initUI', initUI);          // P1：标签栏/rail 切换、Sheet、Toast、首启引导
     safe('initPerfMonitor', initPerfMonitor);
     safe('render', render);
     safe('initSkyClouds', initSkyClouds); // 主天空云彩层（共享云引擎，与开场同一片云）
@@ -1962,6 +1966,107 @@
     safe('initSplash', function () { initSplash(function () { safe('vaultGate', VaultCtl.vaultGate); }); });
     safe('boot', boot);
   }
+  // ============================================================
+  // P1 · 信息架构 UI 层：标签栏 / rail 切换 + 首启引导 + 全局 Toast
+  // （与既有数据/渲染逻辑解耦，仅负责导航外壳与反馈）
+  // ============================================================
+  function openTab(name) {
+    var panels = document.querySelectorAll('.tabpanel');
+    var tabs = document.querySelectorAll('#tabbar .tab, #rail .rail-item');
+    var target = null;
+    Array.prototype.forEach.call(panels, function (p) {
+      var on = p.getAttribute('data-tab') === name;
+      p.hidden = !on;
+      if (on) { p.classList.add('is-active'); target = p; }
+      else { p.classList.remove('is-active'); }
+    });
+    Array.prototype.forEach.call(tabs, function (t) {
+      var on = t.getAttribute('data-tab') === name;
+      t.classList.toggle('is-active', on);
+      if (on) t.setAttribute('aria-current', 'page');
+      else t.removeAttribute('aria-current');
+    });
+    // 切到非「窗」标签时，确保城市 Sheet 已收起
+    if (name !== 'window' && typeof closeCitySheet === 'function') closeCitySheet();
+    // 焦点交给目标面板标题，保证键盘 / 读屏可达
+    if (target) {
+      var h = target.querySelector('.panel-title, .me-name, h1');
+      try { if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } } catch (e) {}
+    }
+    try { window.scrollTo(0, 0); } catch (e) {}
+  }
+
+  function toast(msg, type, opts) {
+    var host = document.getElementById('toastHost');
+    if (!host) return null;
+    var el = document.createElement('div');
+    el.className = 'toast ' + (type || 'ok');
+    var dot = document.createElement('span'); dot.className = 'tdot';
+    var txt = document.createElement('span'); txt.textContent = msg;
+    el.appendChild(dot); el.appendChild(txt);
+    if (opts && typeof opts.undo === 'function') {
+      var ub = document.createElement('button');
+      ub.type = 'button'; ub.className = 'toast-undo'; ub.textContent = '撤销';
+      ub.addEventListener('click', function () { try { opts.undo(); } catch (e) {} dismiss(); });
+      el.appendChild(ub);
+    }
+    host.appendChild(el);
+    haptic(8);
+    var timer = setTimeout(dismiss, (opts && opts.duration) ? opts.duration : 2600);
+    function dismiss() {
+      clearTimeout(timer);
+      el.classList.add('leaving');
+      el.addEventListener('animationend', function () {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, { once: true });
+    }
+    el.addEventListener('click', function (e) { if (e.target === el) dismiss(); });
+    return { dismiss: dismiss };
+  }
+
+  function showCoach() {
+    var coach = document.getElementById('coach');
+    var ok = document.getElementById('coachOk');
+    if (!coach) return;
+    coach.hidden = false;
+    if (ok) ok.addEventListener('click', function () {
+      coach.hidden = true;
+      try { localStorage.setItem('shinian.coach.v1', '1'); } catch (e) {}
+    });
+  }
+
+  function initUI() {
+    // 标签栏 / 左侧 rail 切换（同一处理函数，互不混用）
+    Array.prototype.forEach.call(
+      document.querySelectorAll('#tabbar .tab, #rail .rail-item'),
+      function (t) {
+        t.addEventListener('click', function () { openTab(t.getAttribute('data-tab')); });
+      }
+    );
+    // 齿轮跳转「我的」设置页
+    var gear = document.getElementById('settingsBtn');
+    if (gear) gear.addEventListener('click', function () { openTab('me'); });
+    // 悬浮新增：聚焦对应输入框
+    var wf = document.getElementById('wishesFab');
+    if (wf) wf.addEventListener('click', function () {
+      openTab('wishes');
+      setTimeout(function () { var n = document.getElementById('cdName'); if (n) try { n.focus(); } catch (e) {} }, 300);
+    });
+    var pf = document.getElementById('poolFab');
+    if (pf) pf.addEventListener('click', function () {
+      openTab('pool');
+      setTimeout(function () { var w = document.getElementById('wishText'); if (w) try { w.focus(); } catch (e) {} }, 300);
+    });
+    // 首屏默认落在「窗」标签
+    openTab('window');
+    // 首启轻引导（仅首次）
+    var seen = false;
+    try { seen = localStorage.getItem('shinian.coach.v1') === '1'; } catch (e) {}
+    if (!seen) setTimeout(showCoach, 900);
+    // 暴露给外部（如需扩展）
+    window.ShiNianUI = { openTab: openTab, toast: toast };
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', startupSequence);
   } else {

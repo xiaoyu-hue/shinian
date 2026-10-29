@@ -1,0 +1,115 @@
+/* ============================================================
+   时念 · 设计令牌（Design Tokens）— P0 地基
+   ------------------------------------------------------------
+   三级令牌体系（参考 Open Props 思路，零构建、纯 CSS 变量）：
+     ① 原语（primitive）   —— 不直接使用，仅用于派生
+     ② 语义（semantic）    —— 组件应消费的抽象层（颜色/间距/圆角…）
+     ③ 组件（component）   —— 具体组件的尺寸/阴影/层级
+
+   本文件只产出「尺度 / 圆角 / 阴影 / 动效 / 层级 / 字阶」等通用令牌，
+   与 style.css 内的「天空/玻璃/文字」色彩体系正交，互不覆盖。
+   所有令牌默认走 :root，亮配方（[data-recipe="light"]）只覆盖色彩变量，
+   尺度令牌保持全局一致，保证暗/亮两套主题间距不变形。
+   ============================================================ */
+
+:root {
+  /* ---------- ① 间距尺度（8pt 栅格） ---------- */
+  --sp-0: 0;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+  --sp-9: 56px;
+  --sp-10: 72px;
+
+  /* ---------- ① 圆角尺度（同心圆角 squircle 取向） ---------- */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;     /* 卡片默认，与既有 --radius 对齐 */
+  --r-xl: 28px;
+  --r-2xl: 36px;
+  --r-pill: 999px;
+
+  /* ---------- ① 阴影尺度（环境光阴影，暗色主题更克制） ---------- */
+  --sh-0: none;
+  --sh-1: 0 2px 8px rgba(2, 10, 18, .28);
+  --sh-2: 0 8px 22px rgba(2, 10, 18, .32);
+  --sh-3: 0 16px 40px rgba(2, 10, 18, .38);
+  --sh-float: 0 12px 30px rgba(2, 10, 18, .42);   /* FAB / 浮层 */
+
+  /* ---------- ① 动效尺度 ---------- */
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 280ms;
+  --dur-4: 420ms;
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(.22, 1, .36, 1);
+  --ease-emphasized: cubic-bezier(.3, 0, 0, 1);
+
+  /* ---------- ① 层级（z-index） ---------- */
+  --z-sky: -1;
+  --z-content: 1;
+  --z-tabbar: 40;
+  --z-rail: 40;
+  --z-sheet: 80;
+  --z-toast: 90;
+  --z-scrim: 78;
+  --z-coach: 95;
+  --z-vault: 9999;
+  --z-splash: 9999;
+
+  /* ---------- ① 字阶（移动端优先，clamp 自适应） ---------- */
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-base: 14px;
+  --fs-lg: 15px;
+  --fs-xl: 17px;
+  --fs-2xl: 20px;
+  --fs-display: clamp(56px, 19vw, 92px);
+
+  /* ---------- ② 语义：触控目标最小尺寸 ---------- */
+  --tap-min: 44px;
+  --tap-min-sm: 40px;
+
+  /* ---------- ② 语义：内容最大宽度（手机栏宽 / 桌面内容列） ---------- */
+  --content-max: 430px;
+  --content-wide: 720px;
+  --tabbar-h: 64px;
+  --rail-w: 84px;
+
+  /* ---------- ② 语义：玻璃功能层（标签栏 / 工具栏 / Sheet / FAB）----------
+     与 style.css 的 --glass-* 同源取值，单独列出便于组件统一引用 */
+  --glass-func-bg: rgba(12, 26, 40, .42);
+  --glass-func-border: rgba(150, 210, 255, .16);
+  --glass-func-blur: 22px;
+
+  /* ---------- ③ 组件：标签栏 ---------- */
+  --tabbar-bg: var(--glass-func-bg);
+  --tabbar-border: rgba(150, 210, 255, .14);
+  --tabbar-blur: var(--glass-func-blur);
+  --tab-icon: 22px;
+  --tab-label: 11px;
+  --tab-active: var(--accent);
+
+  /* ---------- ③ 组件：Sheet ---------- */
+  --sheet-bg: rgba(14, 28, 44, .78);
+  --sheet-border: rgba(150, 210, 255, .18);
+  --sheet-blur: 26px;
+  --sheet-radius: var(--r-2xl);
+
+  /* ---------- ③ 组件：Toast ---------- */
+  --toast-bg: rgba(14, 28, 44, .92);
+  --toast-ok: #7fd1a3;
+  --toast-err: #e69a92;
+  --toast-warn: #e3c07a;
+
+  /* ---------- ③ 组件：FAB ---------- */
+  --fab-size: 56px;
+  --fab-bg: var(--accent);
+}
